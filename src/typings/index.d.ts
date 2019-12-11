@@ -1,0 +1,1 @@
+export type TRes = { code: number, msg: string };
