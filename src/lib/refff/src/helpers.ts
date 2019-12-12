@@ -1,13 +1,5 @@
 import _ from 'lodash';
 
-export const flush = (fns: any[]) => {
-  fns.forEach(fn => {
-    if (typeof fn === 'function') {
-      fn();
-    }
-  });
-};
-
 type Path = string | number;
 
 export const isPathContain = (
@@ -47,9 +39,6 @@ export const promisify = (fn: Function): Promise<string | void> => {
     return Promise.reject(error);
   }
 };
-
-export const noop = (): any => {};
-export const noopnoop = () => noop;
 
 export const getEventValue = <T = any>(e: T | { target: { value: T } }) => {
   // Duck Type, 如果它长的比较像 Event, 那就认为是个 event 吧
