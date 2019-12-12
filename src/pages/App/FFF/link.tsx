@@ -1,6 +1,3 @@
-import { ElementType, FC, MutableRefObject } from 'react';
-
-import { Rule } from '@refff/core';
 import { ValidateStatus } from './ctx';
 import { getEventValue } from './utils';
 
@@ -32,34 +29,3 @@ export const link = <
 };
 
 export type Link = typeof link;
-
-type UI = {
-  Form: ElementType;
-  Field: ElementType;
-};
-
-type Validator = (
-  value: MutableRefObject<any>,
-  rule: Rule,
-  label?: string
-) => string | void | Promise<string | void>;
-
-const Empty: FC = () => null;
-
-const settings: {
-  UI: UI;
-  validator: Validator;
-  link: Link;
-} = {
-  UI: {
-    Form: Empty,
-    Field: Empty
-  },
-  validator: rules => {
-    if (!rules) return;
-    throw new Error('settings.validator missed');
-  },
-  link: link
-};
-
-export { settings };

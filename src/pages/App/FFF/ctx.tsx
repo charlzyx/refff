@@ -5,7 +5,12 @@ import { FormConfig } from './Form';
 import { Patch } from 'immer';
 
 type autoDisposer = () => void;
-export type ValidateResult = 'init' | 'validating' | 'success';
+export type ValidateStatus =
+  | 'init'
+  | 'validating'
+  | 'success'
+  | 'error'
+  | 'timeout';
 
 export const Events = (fid: string) => ({
   change: fid + '_change',
@@ -25,12 +30,14 @@ export declare namespace Event {
   type reset = (event: { path?: string }) => void;
   /** clean validate */
   type clean = (event: { path?: string }) => void;
-  type validtor = () => Promise<any>;
-  type validate = (event: { vid: string; error: string }) => void;
+  /** TODO: validate 的 event 不知道应该包含什么 */
+  type validate = (event: { vid: string; status: ValidateStatus }) => void;
+  /** 成功总是会返回 promise, 报错会在 catch 里面取 Error.message */
+  type validator = () => Promise<string | void>;
   type mounted = (event: {
     vid: string;
     path: string;
-    checker: validtor;
+    checker: validator;
   }) => void;
   type unmounted = (event: { vid: string }) => void;
 }
@@ -86,18 +93,3 @@ export const Ctx = createContext<Ctx>({
 const { Provider, Consumer } = Ctx;
 
 export { Provider, Consumer };
-
-type W<T> = {
-  ooo: T;
-};
-
-type Param<T> = {
-  init: T;
-};
-
-const F = <T extends object>(param: Param<T>) => {
-  const { init } = param;
-  return init;
-};
-
-const x = F({ init: { objk: 'xx' } });

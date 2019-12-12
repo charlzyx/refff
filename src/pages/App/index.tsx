@@ -1,40 +1,32 @@
+import './settings';
+
+import { Field, Form } from './FFF';
 /* eslint-disable no-console */
-import React, { FC, useCallback, useEffect, useState } from 'react';
+import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 
-import { Button } from 'antd';
-import useForm from './FFF/useForm';
+import { Input } from 'antd';
 
-const Box = () => {
-  const { data, put, undo, redo } = useForm({ a: 1, b: { c: 1 } });
-
-  const [, forceUpdate] = useState(0);
-  const add = useCallback(() => {
-    put(x => {
-      x.b.c++;
-    });
-    forceUpdate(+new Date());
-  }, []);
-
-  const actUndo = useCallback(() => {
-    undo();
-    forceUpdate(+new Date());
-  }, []);
-
-  const actRedo = useCallback(() => {
-    redo();
-    forceUpdate(+new Date());
-  }, []);
-
+const App = () => {
+  const data = useRef({ a: 1, b: { c: 2 } });
+  const actions = useRef<Parameters<typeof Form>['0']['actions']>();
   return (
     <div>
       <pre>{JSON.stringify(data, null, 2)}</pre>
-      <Button onClick={add} type="primary">
-        ++
-      </Button>
-      <Button onClick={actUndo}>undo</Button>
-      <Button onClick={actRedo}>redo</Button>
+      <Form
+        init={data.current}
+        // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+        // @ts-ignore
+        actions={actions}
+      >
+        <Field label="hh" __path="a">
+          <Input></Input>
+        </Field>
+        <Field label="hh" __path="b.c">
+          <Input></Input>
+        </Field>
+      </Form>
     </div>
   );
 };
 
-export default Box;
+export default App;

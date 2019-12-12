@@ -1,19 +1,11 @@
-/* eslint-disable prettier/prettier */
-import { Consumer, Ctx, Event, Events, Provider, ValidateResult } from './ctx';
-import { Immutable, Patch, Produced, applyPatches, produce } from 'immer';
+import { Ctx, Event, Events, Provider, ValidateStatus } from './ctx';
+import { Patch, Produced, applyPatches, produce } from 'immer';
 import React, {
-  FC,
   FunctionComponent,
   MutableRefObject,
-  PropsWithChildren,
-  ReactElement,
-  WeakValidationMap,
-  createContext,
   useCallback,
-  useContext,
   useEffect,
-  useRef,
-  useState
+  useRef
 } from 'react';
 import mitt, { Emitter } from 'mitt';
 
@@ -28,7 +20,7 @@ type THistory = {
 };
 
 type ValidMap = {
-  [vid: string]: ValidateResult;
+  [vid: string]: ValidateStatus;
 };
 
 type PathMap = {
@@ -45,16 +37,16 @@ export type TForm<T> = {
   config?: FormConfig;
 };
 
-
 export type Props<T> = {
   init: T;
   config?: FormConfig;
   actions: MutableRefObject<{
-    put: (recipe: (copy: T) => void | T) => T | Produced<T, T>
-    reset: (path?: string) => void
-    clean: (path?: string) => void
-    checking: (path?: string) => Promise<ValidateResult | ValidateResult[]>
-  }>
+    put: (recipe: (copy: T) => void | T) => T | Produced<T, T>;
+    reset: (path?: string) => void;
+    clean: (path?: string) => void;
+    /** 报错在 catch 里 */
+    checking: (path?: string) => Promise<void>;
+  }>;
 };
 
 interface IForm {
@@ -74,7 +66,7 @@ export const Form: IForm = ({ init, children, config = {}, actions }) => {
   const data = useRef(init);
   const validMap = useRef<ValidMap>({});
   const pathMap = useRef<PathMap>({});
-  const checkerQueue = useRef<{vid: string, runner: Event.validtor}[]>([]);
+  const checkerQueue = useRef<{ vid: string; runner: Event.validator }[]>([]);
 
   const ctx = useRef<Ctx<typeof init>>({
     config,
@@ -157,36 +149,50 @@ export const Form: IForm = ({ init, children, config = {}, actions }) => {
         history.current.redos.push(...patches);
         history.current.undos.push(...inversPatches.reverse());
         patches.forEach(patch => {
-          emits.change({ value: patch.value, path: patch.path, source: uid.current })
-        })
+          emits.change({
+            value: patch.value,
+            path: patch.path,
+            source: uid.current
+          });
+        });
       });
       data.current = next as typeof init;
       return next;
-    }, []);
+    },
+    []
+  );
 
-  const doReset = useCallback<typeof actions.current.reset>((path) => {
+  const doReset = useCallback<typeof actions.current.reset>(path => {
     const next = applyPatches(data.current, history.current.undos);
     data.current = next;
     emits.reset({ path });
   }, []);
-  const doClean = useCallback<typeof actions.current.clean>((path) => {
+
+  const doClean = useCallback<typeof actions.current.clean>(path => {
     emits.clean({ path });
   }, []);
-  const doChecking = useCallback<typeof actions.current.checking>((path) => {
-    // return Promise.resolve('init');
+
+  const doChecking = useCallback<typeof actions.current.checking>(path => {
     if (path) {
-      const checker = checkerQueue.current.find(c => pathMap.current[c.vid] === path);
+      const checker = checkerQueue.current.find(
+        c => pathMap.current[c.vid] === path
+      );
       if (checker && typeof checker.runner === 'function') {
-        return checker.runner();
+        // to return void
+        return checker.runner().then(() => {});
       } else {
-        return Promise.resolve('success');
+        return Promise.resolve();
       }
     } else {
-      return Promise.all(checkerQueue.current.map(c => c.runner()));
+      // to return void
+      return Promise.all(
+        checkerQueue.current.map(c => c.runner())
+      ).then(() => {});
     }
   }, []);
 
   // 监听者们
+
   const onMounted = useCallback<Event.mounted>(({ vid, path, checker }) => {
     pathMap.current[vid] = path;
     validMap.current[vid] = 'init';
@@ -197,7 +203,7 @@ export const Form: IForm = ({ init, children, config = {}, actions }) => {
     delete validMap.current[vid];
     checkerQueue.current.forEach((c, index) => {
       if (c.vid === vid) {
-        checkerQueue.current.splice(index, 1)
+        checkerQueue.current.splice(index, 1);
       }
     });
   }, []);
@@ -205,12 +211,16 @@ export const Form: IForm = ({ init, children, config = {}, actions }) => {
     if (source === uid.current) return;
     _.set(data.current, path, value);
   }, []);
-  const onValidate = useCallback<Event.validate>(({vid, result}) => {
-    validMap.current[vid] = result;
+  const onValidate = useCallback<Event.validate>(({ vid, status }) => {
+    validMap.current[vid] = status;
   }, []);
 
   // 事件的注册与销毁
   useEffect(() => {
+    event.on('*', (...args) => {
+      console.log(data);
+      console.log(args);
+    });
     const unlistens: Function[] = [];
     unlistens.push(ctx.current.actions.on.change(onChange));
     unlistens.push(ctx.current.actions.on.validate(onValidate));
@@ -228,13 +238,13 @@ export const Form: IForm = ({ init, children, config = {}, actions }) => {
     }
   }, [config]);
   useEffect(() => {
-    if (actions) {
+    if (actions.current) {
       actions.current.put = doPut;
       actions.current.reset = doReset;
       actions.current.clean = doClean;
       actions.current.checking = doChecking;
     }
-  }, [actions])
+  }, [actions]);
 
   return <Provider value={ctx.current}>{children}</Provider>;
 };

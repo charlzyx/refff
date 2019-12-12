@@ -1,5 +1,6 @@
-import { Ctx, Event, ValidateResult } from './ctx';
+import { Ctx, Event, ValidateStatus } from './ctx';
 import { FiledProps, Rule } from '@refff/core';
+import { Link, settings } from './settings';
 import React, {
   FC,
   ReactElement,
@@ -10,12 +11,13 @@ import React, {
   useRef,
   useState
 } from 'react';
-import { flush, isPathContain } from './utils';
+import { flush, isPathContain, promisify, useRefState } from './utils';
 
 import _ from 'lodash';
-import { settings } from './settings';
 
-const notReady = () => Promise.resolve('init');
+const { UI, validator, link: defaultLink } = settings;
+
+const notReady = () => Promise.resolve();
 
 type OneOf<T, U> =
   | ({ [P in keyof T]?: never } & U)
@@ -23,13 +25,15 @@ type OneOf<T, U> =
 
 type Base = {
   trigger?: 'onBlur' | 'onChange';
-  children: ReactElement;
+  children: ReactElement | ((props: object) => ReactElement);
   editable?: boolean;
   rules?: Rule | Rule[];
-} & FiledProps;
+  link?: Link;
+  label?: string;
+} & Omit<FiledProps, 'children'>;
 
 type WithPath = {
-  path: string;
+  path: any;
 };
 
 type WithUnderPath = {
@@ -40,56 +44,101 @@ type WithoutPath = {};
 
 type Props = OneOf<WithPath, OneOf<WithUnderPath, WithoutPath>> & Base;
 
-const { UI, validator } = settings;
-
 export const Field: FC<Props> = ({
   children,
-  path = '',
   __path = '',
   trigger,
   rules,
+  editable,
+  link,
   ...others
 }) => {
-  const finalPath = __path || path;
   const uid = useRef(_.uniqueId('fff_filed'));
   const {
     actions: { on, emit },
     data,
     config
   } = useContext(Ctx);
-  const [value, setValue] = useState(_.get(data, finalPath));
-  const [validStatus, setValidStatus] = useState<ValidateResult>('init');
+  const [value, setValue, valueRef] = useRefState(_.get(data, __path));
+  const [help, setHelp] = useState('');
+  const [valid, setValidStatus] = useState<ValidateStatus>('init');
+  const race = useRef(0);
   const finalTrigger = trigger || config.trigger;
+  const finalEditable = editable || config.editable;
 
-  const checkerRef = useRef(notReady);
+  const checkerRef = useRef<Event.validator>(notReady);
 
   // 触发方法们
   const doChange = useCallback((next: typeof value) => {
     setValue(next);
-    emit.change({ value: next, path: finalPath, source: uid.current });
+    emit.change({ value: next, path: __path, source: uid.current });
   }, []);
-  // 如何保证 check 的时候值是最新的, 而不是闭包里的
-  const doValidate = useCallback<Event.validtor>(() => {
+  const doValidate = useCallback<Event.validator>(() => {
     setValidStatus('validating');
-  }, [rules, value]);
+    const count = race.current++;
+    if (!rules) {
+      setValidStatus('success');
+      return Promise.resolve();
+    }
+    if (Array.isArray(rules)) {
+      return Promise.all(
+        rules.map(rule =>
+          promisify(() => validator(valueRef, rule, others.label))
+        )
+      )
+        .then(results => {
+          if (count < race.current) {
+            return 'timeout';
+          }
+          const msg = results.find(x => x);
+          setValidStatus('success');
+          setHelp(msg || '');
+        })
+        .catch(error => {
+          if (count < race.current) {
+            return 'timeout';
+          }
+          setValidStatus('error');
+          setHelp(error?.message || '出错了');
+          throw error;
+        });
+    } else {
+      return promisify(() => validator(valueRef, rules, others.label))
+        .then(msg => {
+          if (count < race.current) {
+            return 'timeout';
+          }
+          setValidStatus('success');
+          setHelp(msg || '');
+        })
+        .catch(error => {
+          if (count < race.current) {
+            return 'timeout';
+          }
+          setValidStatus('error');
+          setHelp(error?.message || '出错了');
+          throw error;
+        });
+    }
+  }, [rules]);
 
   // 监听者们
   const onChange = useCallback<Event.change>(({ value, path, source }) => {
     if (source === uid.current) return;
-    const next = _.get(data, finalPath);
-    if (isPathContain(finalPath, path) && next !== value) {
+    const next = _.get(data, __path);
+    if (isPathContain(__path, path) && next !== value) {
       setValue(next);
     }
   }, []);
   const onReset = useCallback<Event.reset>(({ path }) => {
-    const should = !path || path === finalPath;
+    const should = !path || path === __path;
     if (should) {
-      setValue(_.get(data, finalPath));
+      setValue(_.get(data, __path));
       setValidStatus('init');
     }
   }, []);
   const onClean = useCallback<Event.clean>(({ path }) => {
-    const should = !path || path === finalPath;
+    const should = !path || path === __path;
     if (should) {
       setValidStatus('init');
     }
@@ -100,7 +149,7 @@ export const Field: FC<Props> = ({
     const unlistens: Function[] = [];
     emit.mounted({
       vid: uid.current,
-      path: finalPath,
+      path: __path,
       checker: () => {
         return checkerRef.current();
       }
@@ -117,24 +166,60 @@ export const Field: FC<Props> = ({
 
   useEffect(() => {
     if (finalTrigger === 'onChange') {
-      // do validate
+      doValidate();
     }
   }, [value]);
+
   useEffect(() => {
     checkerRef.current = doValidate;
   }, [doValidate]);
-  const overrides = {
-    validStatus,
+
+  useEffect(() => {
+    if (valid !== 'timeout') {
+      emit.validate({ vid: uid.current, status: valid });
+    }
+  }, [valid]);
+
+  const overChange = useCallback((next: typeof value) => {
+    doChange(next);
+    return next;
+  }, []);
+
+  const overBlur = useCallback(e => {
+    if (finalTrigger === 'onBlur') {
+      doValidate();
+    }
+    return e;
+  }, []);
+
+  const childProps = (children as ReactElement).props || {};
+  const rides = {
     value,
-    onChange
+    onChange: overChange,
+    onBlur: overBlur,
+    editable: finalEditable,
+    valid,
+    help
   };
+  const childrenStaticLink =
+    children && (children as any).type && (children as any).type.link;
+
+  const defaultOver = defaultLink(childProps, rides);
+  const staticOver = childrenStaticLink
+    ? childrenStaticLink(childProps, defaultOver)
+    : defaultOver;
+  const propsOver = link ? link(childProps, staticOver) : staticOver;
+
+  const overrides = {
+    ...defaultOver,
+    ...staticOver,
+    ...propsOver
+  };
+
   if (typeof children === 'function') {
     return <UI.Field {...others}>{children(overrides)}</UI.Field>;
+  } else {
+    const clone = cloneElement(children as ReactElement, overrides);
+    return <UI.Field {...others}>{clone}</UI.Field>;
   }
-  const childProps = children.props;
-  const clone = cloneElement(children, {
-    ...childProps,
-    ...overrides
-  });
-  return <UI.Field {...others}>{clone}</UI.Field>;
 };
