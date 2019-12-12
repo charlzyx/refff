@@ -22,7 +22,8 @@ module.exports = override(
   addBabelPlugin(['lodash']),
   addBabelPlugin(['@babel/plugin-proposal-optional-chaining']),
   addWebpackAlias({
-    '@': path.resolve(__dirname, './src')
+    '@': path.resolve(__dirname, './src'),
+    '@refff/core': path.resolve(__dirname, './src/lib/refff/src')
   }),
   addLessLoader({
     javascriptEnabled: true

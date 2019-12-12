@@ -1,8 +1,7 @@
 import { ElementType, FC, MutableRefObject } from 'react';
+import { Rule, ValidateStatus } from '@refff/core';
 
-import { Rule } from '@refff/core';
-import { ValidateStatus } from './ctx';
-import { getEventValue } from './utils';
+import { getEventValue } from './helpers';
 
 type Overrides<T> = {
   value: T;
@@ -22,7 +21,7 @@ export const link = <
 ) => {
   const oc = overrides.onChange;
   const onChange = (v: any) => {
-    oc(getEventValue(v));
+    return oc(getEventValue(v));
   };
   return {
     ...props,

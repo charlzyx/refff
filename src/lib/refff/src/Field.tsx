@@ -1,5 +1,5 @@
-import { Ctx, Event, ValidateStatus } from './ctx';
-import { FiledProps, Rule } from '@refff/core';
+/* eslint-disable no-console */
+import { Event, FiledProps, Rule, ValidateStatus } from '@refff/core';
 import { Link, settings } from './settings';
 import React, {
   FC,
@@ -11,9 +11,12 @@ import React, {
   useRef,
   useState
 } from 'react';
-import { flush, isPathContain, promisify, useRefState } from './utils';
+import { isPathContain, promisify } from './helpers';
+import pool, { dying } from './pool';
 
+import { Ctx } from './ctx';
 import _ from 'lodash';
+import { useRefState } from './hooks';
 
 const { UI, validator, link: defaultLink } = settings;
 
@@ -54,11 +57,8 @@ export const Field: FC<Props> = ({
   ...others
 }) => {
   const uid = useRef(_.uniqueId('fff_filed'));
-  const {
-    actions: { on, emit },
-    data,
-    config
-  } = useContext(Ctx);
+  const { fid, data, config } = useContext(Ctx);
+  const { emit, on } = pool.get(fid);
   const [value, setValue, valueRef] = useRefState(_.get(data, __path));
   const [help, setHelp] = useState('');
   const [valid, setValidStatus] = useState<ValidateStatus>('init');
@@ -146,7 +146,6 @@ export const Field: FC<Props> = ({
 
   // 事件的注册与销毁
   useEffect(() => {
-    const unlistens: Function[] = [];
     emit.mounted({
       vid: uid.current,
       path: __path,
@@ -154,12 +153,14 @@ export const Field: FC<Props> = ({
         return checkerRef.current();
       }
     });
-    unlistens.push(on.change(onChange));
-    unlistens.push(on.reset(onReset));
-    unlistens.push(on.clean(onClean));
+    const godie = dying(
+      uid.current,
+      on.change(onChange),
+      on.reset(onReset),
+      on.clean(onClean)
+    );
     return () => {
-      // cleaner
-      flush(unlistens);
+      godie();
       emit.unmounted({ vid: uid.current });
     };
   }, []);

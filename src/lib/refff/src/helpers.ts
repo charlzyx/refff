@@ -1,13 +1,3 @@
-import {
-  Dispatch,
-  EventHandler,
-  MutableRefObject,
-  SetStateAction,
-  useCallback,
-  useRef,
-  useState
-} from 'react';
-
 import _ from 'lodash';
 
 export const flush = (fns: any[]) => {
@@ -60,38 +50,6 @@ export const promisify = (fn: Function): Promise<string | void> => {
 
 export const noop = (): any => {};
 export const noopnoop = () => noop;
-
-const get = <S>(init: S | (() => S)): S => {
-  if (init instanceof Function) {
-    return init();
-  }
-  return init;
-};
-
-export const useRefState = <S>(
-  initialState: S | (() => S)
-): [S, Dispatch<SetStateAction<S>>, MutableRefObject<S>] => {
-  const ref = useRef(get(initialState));
-  const [state, setState] = useState(() => {
-    const value = get(initialState);
-    ref.current = value;
-    return value;
-  });
-
-  const setValue = useCallback<typeof setState>(next => {
-    if (next instanceof Function) {
-      setState(prev => {
-        const nextValue = next(prev);
-        ref.current = nextValue;
-        return nextValue;
-      });
-    } else {
-      ref.current = next;
-      setState(next);
-    }
-  }, []);
-  return [state, setValue, ref];
-};
 
 export const getEventValue = <T = any>(e: T | { target: { value: T } }) => {
   // Duck Type, 如果它长的比较像 Event, 那就认为是个 event 吧
