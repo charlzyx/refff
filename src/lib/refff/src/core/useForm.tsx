@@ -41,17 +41,28 @@ export const useForm = <T extends object, R extends object>(
       redos.current.push(patch);
       const next = applyPatches(data.current, [patch]);
       data.current = next;
+      emit.change({
+        next: patch.value,
+        path: patch.path,
+        source: uid.current
+      });
     }
-  }, []);
+  }, [emit]);
 
   const redo = useCallback(() => {
     const patch = redos.current.pop();
+    redos.current.pop();
     if (patch) {
       history.current.push(patch);
       const next = applyPatches(data.current, [patch]);
       data.current = next;
+      emit.change({
+        next: patch.value,
+        path: patch.path,
+        source: uid.current
+      });
     }
-  }, []);
+  }, [emit]);
 
   // 外部触发的方法们
   const doPut = useCallback(
@@ -60,7 +71,7 @@ export const useForm = <T extends object, R extends object>(
         history.current.push(...inversPatches.reverse());
         patches.forEach(patch => {
           emit.change({
-            value: patch.value,
+            next: patch.value,
             path: patch.path,
             source: uid.current
           });
@@ -75,8 +86,8 @@ export const useForm = <T extends object, R extends object>(
   const doReset = useCallback(
     (path?: string) => {
       const next = applyPatches(data.current, [
-        ...history.current,
-        ...redos.current.reverse()
+        ...redos.current.reverse(),
+        ...history.current
       ]);
       history.current = [];
       redos.current = [];
@@ -132,9 +143,19 @@ export const useForm = <T extends object, R extends object>(
       }
     });
   }, []);
-  const onChange = useCallback<Event.change>(({ value, path, source }) => {
+  const onChange = useCallback<Event.change>(({ next, path, source }) => {
     if (source === uid.current) return;
-    _.set(data.current, path, value);
+    const nextV = produce(
+      data.current,
+      draft => {
+        _.set(draft, path, next);
+      },
+      (patches, inversPatches) => {
+        history.current.push(...inversPatches.reverse());
+      }
+    );
+    data.current = nextV as T;
+    // _.set(data.current, path, value);
   }, []);
   const onValidate = useCallback<Event.validate>(({ vid, status }) => {
     validMap.current[vid] = status;

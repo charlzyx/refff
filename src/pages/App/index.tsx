@@ -1,8 +1,7 @@
+import { Button, Input } from '@/lib/antd';
 import { Field, Form, useForm } from '@refff/core';
 /* eslint-disable no-console */
 import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
-
-import { Input } from '@/lib/antd';
 
 const App = () => {
   const { data, clean, valid, put, checking, reset } = useForm(
@@ -17,7 +16,7 @@ const App = () => {
       end: ''
     },
     (...args) => {
-      console.log('somthing', args);
+      // console.log('somthing', args);
     },
     dd => {
       return { ...dd, range: [dd.start, dd.end] };

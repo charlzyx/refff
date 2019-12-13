@@ -88,7 +88,7 @@ export const Field: FC<Props> = ({
   const doChange = useCallback(
     (next: typeof value) => {
       setValue(next);
-      emit.change({ value: next, path: __path, source: uid.current });
+      emit.change({ next, path: __path, source: uid.current });
     },
     [__path, emit, setValue, value]
   );
@@ -143,14 +143,15 @@ export const Field: FC<Props> = ({
 
   // 监听者们
   const onChange = useCallback<Event.change>(
-    ({ value, path, source }) => {
+    ({ next, path, source }) => {
+      console.log('source', { value, path, source });
       if (source === uid.current) return;
-      const next = _.get(data.current, __path);
+      // const next = _.get(data.current, __path);
       if (isPathContain(__path, path) && next !== value) {
         setValue(next);
       }
     },
-    [__path, data, setValue]
+    [__path, setValue, value]
   );
   const onReset = useCallback<Event.reset>(
     ({ path }) => {

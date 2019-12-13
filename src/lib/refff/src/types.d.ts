@@ -21,7 +21,7 @@ export declare module '@refff/core' {
     type validator = () => Promise<string | void>;
     /** Field <-> useForm 双向数据变更 */
     type change = (event: {
-      value: any;
+      next: any;
       path: string | number | (string | number)[];
       source: string;
     }) => void;

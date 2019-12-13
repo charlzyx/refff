@@ -20,6 +20,7 @@ const events = (id: string): Events => {
         emitter.on('*', fn);
       },
       change(fn) {
+        console.log('onchange');
         emitter.on(types.change, fn);
         return () => {
           emitter.off(types.change, fn);
