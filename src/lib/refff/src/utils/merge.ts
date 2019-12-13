@@ -56,8 +56,6 @@ const pipe = (
         break;
     }
   });
-  // TODOOOOOOOO
-  console.log('pipes', pipes);
 
   return {
     to: pipes.to,

@@ -1,32 +1,24 @@
-import { DeepReadonly, Event, ValidateStatus } from '@refff/core';
+import { DeepReadonly, Effects, Event, PathMap, ValidMap } from '@refff/core';
 import { Patch, applyPatches, produce } from 'immer';
-import { dying, pool } from '../utils';
-import { useCallback, useEffect, useRef } from 'react';
+import { dying, isValid, pool } from '../utils';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Ctx } from './ctx';
+import { Diff } from 'utility-types';
 import _ from 'lodash';
 
-type THistory = {
-  redos: Patch[];
-  undos: Patch[];
-};
+const pass = <T extends object>(x: T) => x;
 
-type ValidMap = {
-  [vid: string]: ValidateStatus;
-};
-
-type PathMap = {
-  [vid: string]: string;
-};
-
-type Effects = void | 'change' | 'reset';
-
-export const useForm = <T extends object>(
+export const useForm = <T extends object, R extends T>(
   init: T,
+  pipein?: (data: T) => R,
+  pipeout?: (next: R) => T,
   effect?: (data: T, type: Effects, e?: any) => void
 ) => {
   const uid = useRef(_.uniqueId('fff_form'));
-  const data = useRef(init);
+  const done = pipein ? pipein(init) : [init, pass];
+  const data = useRef<T>(done as T);
+  const [valid, setValid] = useState(false);
   const validMap = useRef<ValidMap>({});
   const pathMap = useRef<PathMap>({});
   const checkerQueue = useRef<{ vid: string; runner: Event.validator }[]>([]);
@@ -64,52 +56,67 @@ export const useForm = <T extends object>(
   }, []);
 
   // 外部触发的方法们
-  const doPut = useCallback((recipe: (copy: T) => void | T) => {
-    const next = produce(data.current, recipe, (patches, inversPatches) => {
-      history.current.push(...inversPatches.reverse());
-      patches.forEach(patch => {
-        emit.change({
-          value: patch.value,
-          path: patch.path,
-          source: uid.current
+  const doPut = useCallback(
+    (recipe: (copy: T) => void | T) => {
+      const next = produce(data.current, recipe, (patches, inversPatches) => {
+        history.current.push(...inversPatches.reverse());
+        patches.forEach(patch => {
+          emit.change({
+            value: patch.value,
+            path: patch.path,
+            source: uid.current
+          });
         });
       });
-    });
-    data.current = next as T;
-    return next;
-  }, []);
+      data.current = next as T;
+      return pipeout ? pipeout(next as R) : next;
+    },
+    [emit, pipeout]
+  );
 
-  const doReset = useCallback((path?: string) => {
-    const next = applyPatches(data.current, [
-      ...history.current,
-      ...redos.current.reverse()
-    ]);
-    history.current = [];
-    redos.current = [];
-    data.current = next;
-    emit.reset({ path });
-  }, []);
+  const doReset = useCallback(
+    (path?: string) => {
+      const next = applyPatches(data.current, [
+        ...history.current,
+        ...redos.current.reverse()
+      ]);
+      history.current = [];
+      redos.current = [];
+      data.current = next;
+      emit.reset({ path });
+    },
+    [emit]
+  );
 
-  const doClean = useCallback((path?: string) => {
-    emit.clean({ path });
-  }, []);
+  const doClean = useCallback(
+    (path?: string) => {
+      emit.clean({ path });
+    },
+    [emit]
+  );
 
-  const doChecking = useCallback((path?: string) => {
-    if (path) {
-      const checker = checkerQueue.current.find(
-        c => pathMap.current[c.vid] === path
-      );
-      if (checker && typeof checker.runner === 'function') {
-        return checker.runner().then(() => _.get(data.current, path));
+  const doChecking = useCallback(
+    (path?: string) => {
+      if (path) {
+        const checker = checkerQueue.current.find(
+          c => pathMap.current[c.vid] === path
+        );
+        if (checker && typeof checker.runner === 'function') {
+          return checker.runner().then(() => _.get(data.current, path));
+        } else {
+          return Promise.resolve(_.get(data.current, path));
+        }
       } else {
-        return Promise.resolve(_.get(data.current, path));
+        return Promise.all(checkerQueue.current.map(c => c.runner())).then<T>(
+          () => {
+            const real = pipeout ? pipeout(data.current as R) : data.current;
+            return real as T;
+          }
+        );
       }
-    } else {
-      return Promise.all(checkerQueue.current.map(c => c.runner())).then<T>(
-        () => data.current
-      );
-    }
-  }, []);
+    },
+    [pipeout]
+  );
 
   // 监听者们
 
@@ -133,13 +140,15 @@ export const useForm = <T extends object>(
   }, []);
   const onValidate = useCallback<Event.validate>(({ vid, status }) => {
     validMap.current[vid] = status;
+    setValid(isValid(validMap.current));
   }, []);
 
   // 事件的注册与销毁
   useEffect(() => {
     on.debug((type, e) => {
       if (typeof effect === 'function') {
-        effect(data.current, type, e);
+        const next = pipeout ? pipeout(data.current as R) : data.current;
+        effect(next, type, e);
       }
     });
     const godie = dying(
@@ -166,7 +175,7 @@ export const useForm = <T extends object>(
       }
       return Reflect.get(target.current, key);
     }
-  }) as DeepReadonly<T & { __ctx: typeof ctx }>;
+  }) as DeepReadonly<T & R & { __ctx: typeof ctx }>;
 
   type OverChecking = {
     (path: string): Promise<Partial<T>>;
@@ -178,11 +187,13 @@ export const useForm = <T extends object>(
     put: typeof doPut;
     clean: typeof doClean;
     checking: OverChecking;
+    valid: typeof valid;
   } = {
     data: proxy,
     reset: doReset,
     put: doPut,
     clean: doClean,
+    valid,
     checking: doChecking
   };
   return ans;

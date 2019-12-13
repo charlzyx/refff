@@ -28,7 +28,7 @@ export const Form: IForm = ({ data, config, children }) => {
         data.__ctx.current.config = config;
       }
     }
-  }, [config]);
+  }, [config, data.__ctx]);
   return (
     <Provider value={data.__ctx.current}>
       <UI.Form>{children}</UI.Form>

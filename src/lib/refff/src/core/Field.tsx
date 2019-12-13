@@ -90,8 +90,7 @@ export const Field: FC<Props> = ({
       setValue(next);
       emit.change({ value: next, path: __path, source: uid.current });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [__path]
+    [__path, emit, setValue, value]
   );
   const doValidate = useCallback<Event.validator>(() => {
     setValidStatus('validating');
@@ -140,8 +139,7 @@ export const Field: FC<Props> = ({
           throw error;
         });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [others.label, rules]);
+  }, [others.label, rules, valueRef]);
 
   // 监听者们
   const onChange = useCallback<Event.change>(
@@ -152,8 +150,7 @@ export const Field: FC<Props> = ({
         setValue(next);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [__path]
+    [__path, data, setValue]
   );
   const onReset = useCallback<Event.reset>(
     ({ path }) => {
@@ -163,8 +160,7 @@ export const Field: FC<Props> = ({
         setValidStatus('init');
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [__path]
+    [__path, data, setValue]
   );
   const onClean = useCallback<Event.clean>(
     ({ path }) => {
@@ -191,9 +187,10 @@ export const Field: FC<Props> = ({
       on.reset(onReset),
       on.clean(onClean)
     );
+    const vid = uid.current;
     return () => {
       godie();
-      emit.unmounted({ vid: uid.current });
+      emit.unmounted({ vid });
     };
   }, [__path, emit, on, onChange, onClean, onReset]);
 
@@ -218,8 +215,7 @@ export const Field: FC<Props> = ({
       doChange(next);
       return next;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [doChange]
   );
 
   const childProps = (children as ReactElement).props || {};
@@ -244,11 +240,8 @@ export const Field: FC<Props> = ({
   const pipes = merge.pipe(settings.get().pipe, statics.pipe, pipe);
   const byPipes = pipes.by.concat(emitChange);
   const waitOverrides = {
-    value: flush(pipes.to, value),
-    onChange: (x: any) => {
-      console.log('xxx', x, byPipes);
-      return flush(byPipes, x);
-    },
+    value: flush(value, pipes.to),
+    onChange: (x: any) => flush(x, byPipes),
     onBlur: emitBlur,
     editable: finalEditable,
     valid,

@@ -5,22 +5,32 @@ import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from '@/lib/antd';
 
 const App = () => {
-  const { data, clean, put, checking, reset } = useForm(
+  const { data, clean, valid, put, checking, reset } = useForm(
     {
       a: 1,
       b: {
         c: {
           d: 2
         }
-      }
+      },
+      start: '',
+      end: ''
+    },
+    dd => {
+      return { ...dd, range: [dd.start, dd.end] };
+    },
+    next => {
+      return next;
     },
     (...args) => {
-      console.log('efffects', args);
+      console.log('somthing', args);
     }
   );
+
   return (
     <div>
       <Form data={data}>
+        <div>{valid ? 'valid' : 'notvalid'}</div>
         <Field label="Hello" __path="a">
           <Input></Input>
         </Field>

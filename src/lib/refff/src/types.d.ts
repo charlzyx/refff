@@ -99,4 +99,14 @@ export declare module '@refff/core' {
   export type DeepReadonly<T> = {
     [P in keyof T]: DeepReadonly<T[P]>;
   };
+
+  export type ValidMap = {
+    [vid: string]: ValidateStatus;
+  };
+
+  export type PathMap = {
+    [vid: string]: string;
+  };
+
+  export type Effects = void | 'change' | 'reset';
 }
