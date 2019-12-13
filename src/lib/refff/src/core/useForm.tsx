@@ -1,14 +1,10 @@
-import { Event, ValidateStatus } from '@refff/core';
+import { DeepReadonly, Event, ValidateStatus } from '@refff/core';
 import { Patch, applyPatches, produce } from 'immer';
 import { dying, pool } from '../utils';
 import { useCallback, useEffect, useRef } from 'react';
 
 import { Ctx } from './ctx';
 import _ from 'lodash';
-
-type DeepReadonly<T> = {
-  [P in keyof T]: DeepReadonly<T[P]>;
-};
 
 type THistory = {
   redos: Patch[];
@@ -23,7 +19,12 @@ type PathMap = {
   [vid: string]: string;
 };
 
-export const useForm = <T extends object>(init: T) => {
+type Effects = void | 'change' | 'reset';
+
+export const useForm = <T extends object>(
+  init: T,
+  effect?: (data: T, type: Effects, e?: any) => void
+) => {
   const uid = useRef(_.uniqueId('fff_form'));
   const data = useRef(init);
   const validMap = useRef<ValidMap>({});
@@ -32,22 +33,40 @@ export const useForm = <T extends object>(init: T) => {
 
   const ctx = useRef<Ctx>({
     config: {},
-    data: data.current,
+    data: data,
     fid: uid.current
   });
 
-  const history = useRef<THistory>({
-    redos: [],
-    undos: []
-  });
+  const history = useRef<Patch[]>([]);
+  const redos = useRef<Patch[]>([]);
 
   const { emit, on } = pool.get(uid.current);
+
+  /**
+   * WIP: 时光旅行
+   */
+  const undo = useCallback(() => {
+    const patch = history.current.pop();
+    if (patch) {
+      redos.current.push(patch);
+      const next = applyPatches(data.current, [patch]);
+      data.current = next;
+    }
+  }, []);
+
+  const redo = useCallback(() => {
+    const patch = redos.current.pop();
+    if (patch) {
+      history.current.push(patch);
+      const next = applyPatches(data.current, [patch]);
+      data.current = next;
+    }
+  }, []);
 
   // 外部触发的方法们
   const doPut = useCallback((recipe: (copy: T) => void | T) => {
     const next = produce(data.current, recipe, (patches, inversPatches) => {
-      history.current.redos.push(...patches);
-      history.current.undos.push(...inversPatches.reverse());
+      history.current.push(...inversPatches.reverse());
       patches.forEach(patch => {
         emit.change({
           value: patch.value,
@@ -61,7 +80,12 @@ export const useForm = <T extends object>(init: T) => {
   }, []);
 
   const doReset = useCallback((path?: string) => {
-    const next = applyPatches(data.current, history.current.undos);
+    const next = applyPatches(data.current, [
+      ...history.current,
+      ...redos.current.reverse()
+    ]);
+    history.current = [];
+    redos.current = [];
     data.current = next;
     emit.reset({ path });
   }, []);
@@ -113,11 +137,10 @@ export const useForm = <T extends object>(init: T) => {
 
   // 事件的注册与销毁
   useEffect(() => {
-    on.debug((...args) => {
-      // eslint-disable-next-line no-console
-      console.log(data);
-      // eslint-disable-next-line no-console
-      console.log(args);
+    on.debug((type, e) => {
+      if (typeof effect === 'function') {
+        effect(data.current, type, e);
+      }
     });
     const godie = dying(
       uid.current,
@@ -130,6 +153,7 @@ export const useForm = <T extends object>(init: T) => {
     return () => {
       godie();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const proxy = new Proxy(data, {
@@ -138,7 +162,7 @@ export const useForm = <T extends object>(init: T) => {
         return Reflect.get(target, key);
       }
       if (key === '__ctx') {
-        return ctx.current;
+        return ctx;
       }
       return Reflect.get(target.current, key);
     }

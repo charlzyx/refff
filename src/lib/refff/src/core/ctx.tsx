@@ -1,14 +1,15 @@
-import { FormConfig } from './Form';
-import { createContext } from 'react';
+import { MutableRefObject, createContext } from 'react';
+
+import { FormConfig } from '@refff/core';
 
 export type Ctx = {
-  data: object;
+  data: MutableRefObject<object>;
   fid: string;
   config: FormConfig;
 };
 
 export const Ctx = createContext<Ctx>({
-  data: {},
+  data: { current: {} },
   fid: '',
   config: {}
 });

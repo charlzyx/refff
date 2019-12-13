@@ -32,7 +32,7 @@ import _ from 'lodash';
 import { settings } from '../settings';
 import { useRefState } from '../utils/useRefState';
 
-const { UI, validator } = settings;
+const { UI, validator } = settings.get();
 
 const notReady = () => Promise.resolve();
 
@@ -75,7 +75,7 @@ export const Field: FC<Props> = ({
   const uid = useRef(_.uniqueId('fff_filed'));
   const { fid, data, config } = useContext(Ctx);
   const { emit, on } = pool.get(fid);
-  const [value, setValue, valueRef] = useRefState(_.get(data, __path));
+  const [value, setValue, valueRef] = useRefState(_.get(data.current, __path));
   const [help, setHelp] = useState('');
   const [valid, setValidStatus] = useState<ValidateStatus>('init');
   const race = useRef(0);
@@ -85,10 +85,14 @@ export const Field: FC<Props> = ({
   const checkerRef = useRef<Event.validator>(notReady);
 
   // 触发方法们
-  const doChange = useCallback((next: typeof value) => {
-    setValue(next);
-    emit.change({ value: next, path: __path, source: uid.current });
-  }, []);
+  const doChange = useCallback(
+    (next: typeof value) => {
+      setValue(next);
+      emit.change({ value: next, path: __path, source: uid.current });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [__path]
+  );
   const doValidate = useCallback<Event.validator>(() => {
     setValidStatus('validating');
     const count = race.current++;
@@ -136,29 +140,41 @@ export const Field: FC<Props> = ({
           throw error;
         });
     }
-  }, [rules]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [others.label, rules]);
 
   // 监听者们
-  const onChange = useCallback<Event.change>(({ value, path, source }) => {
-    if (source === uid.current) return;
-    const next = _.get(data, __path);
-    if (isPathContain(__path, path) && next !== value) {
-      setValue(next);
-    }
-  }, []);
-  const onReset = useCallback<Event.reset>(({ path }) => {
-    const should = !path || path === __path;
-    if (should) {
-      setValue(_.get(data, __path));
-      setValidStatus('init');
-    }
-  }, []);
-  const onClean = useCallback<Event.clean>(({ path }) => {
-    const should = !path || path === __path;
-    if (should) {
-      setValidStatus('init');
-    }
-  }, []);
+  const onChange = useCallback<Event.change>(
+    ({ value, path, source }) => {
+      if (source === uid.current) return;
+      const next = _.get(data.current, __path);
+      if (isPathContain(__path, path) && next !== value) {
+        setValue(next);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [__path]
+  );
+  const onReset = useCallback<Event.reset>(
+    ({ path }) => {
+      const should = !path || path === __path;
+      if (should) {
+        setValue(_.get(data.current, __path));
+        setValidStatus('init');
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [__path]
+  );
+  const onClean = useCallback<Event.clean>(
+    ({ path }) => {
+      const should = !path || path === __path;
+      if (should) {
+        setValidStatus('init');
+      }
+    },
+    [__path]
+  );
 
   // 事件的注册与销毁
   useEffect(() => {
@@ -179,13 +195,13 @@ export const Field: FC<Props> = ({
       godie();
       emit.unmounted({ vid: uid.current });
     };
-  }, []);
+  }, [__path, emit, on, onChange, onClean, onReset]);
 
   useEffect(() => {
     if (finalTrigger === 'onChange') {
       doValidate();
     }
-  }, [value]);
+  }, [doValidate, finalTrigger, value]);
 
   useEffect(() => {
     checkerRef.current = doValidate;
@@ -195,34 +211,44 @@ export const Field: FC<Props> = ({
     if (valid !== 'timeout') {
       emit.validate({ vid: uid.current, status: valid });
     }
-  }, [valid]);
+  }, [emit, valid]);
 
-  const emitChange = useCallback(next => {
-    doChange(next);
-    return next;
-  }, []);
+  const emitChange = useCallback(
+    next => {
+      doChange(next);
+      return next;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   const childProps = (children as ReactElement).props || {};
 
-  const emitBlur = useCallback(e => {
-    const ob = childProps.onBlur;
-    if (typeof ob === 'function') {
-      ob(e);
-    }
-    if (finalTrigger === 'onBlur') {
-      doValidate();
-    }
-    return e;
-  }, []);
+  const emitBlur = useCallback(
+    e => {
+      const ob = childProps.onBlur;
+      if (typeof ob === 'function') {
+        ob(e);
+      }
+      if (finalTrigger === 'onBlur') {
+        doValidate();
+      }
+      return e;
+    },
+    [childProps.onBlur, doValidate, finalTrigger]
+  );
 
   const statics = ((children && (children as ReactElement).type) ||
-    {}) as typeof settings;
-  const mapping = merge.mapping(settings.map, statics.map, map);
-  const pipes = merge.pipe(settings.pipe, statics.pipe, pipe);
-  const toPipes = pipes.to.concat(emitChange);
+    {}) as ReturnType<typeof settings.get>;
+  const mapping = merge.mapping(settings.get().map, statics.map, map);
+  const pipes = merge.pipe(settings.get().pipe, statics.pipe, pipe);
+  const byPipes = pipes.by.concat(emitChange);
   const waitOverrides = {
-    value: flush(toPipes, value),
-    onChange: (x: any) => flush(pipes.by, x),
+    value: flush(pipes.to, value),
+    onChange: (x: any) => {
+      console.log('xxx', x, byPipes);
+      return flush(byPipes, x);
+    },
     onBlur: emitBlur,
     editable: finalEditable,
     valid,

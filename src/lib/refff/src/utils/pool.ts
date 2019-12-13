@@ -17,7 +17,7 @@ const events = (id: string): Events => {
   return {
     on: {
       debug(fn) {
-        emitter.on(types.change, fn);
+        emitter.on('*', fn);
       },
       change(fn) {
         emitter.on(types.change, fn);

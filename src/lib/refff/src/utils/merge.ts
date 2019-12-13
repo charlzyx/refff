@@ -29,18 +29,35 @@ const pipe = (
           Array.isArray(props.to) && !isEmpty(props.to)
             ? pipes.to.concat(props.to)
             : pipes.to;
+        pipes.by =
+          Array.isArray(props.by) && !isEmpty(props.by)
+            ? pipes.by.concat(props.by)
+            : pipes.by;
+        break;
       case 'static':
         pipes.to =
           Array.isArray(statics.to) && !isEmpty(statics.to)
             ? pipes.to.concat(statics.to)
             : pipes.to;
+        pipes.by =
+          Array.isArray(statics.by) && !isEmpty(statics.by)
+            ? pipes.by.concat(statics.by)
+            : pipes.by;
+        break;
       case 'default':
         pipes.to =
           Array.isArray(defaults.to) && !isEmpty(defaults.to)
             ? pipes.to.concat(defaults.to)
             : pipes.to;
+        pipes.by =
+          Array.isArray(defaults.by) && !isEmpty(defaults.by)
+            ? pipes.by.concat(defaults.by)
+            : pipes.by;
+        break;
     }
   });
+  // TODOOOOOOOO
+  console.log('pipes', pipes);
 
   return {
     to: pipes.to,

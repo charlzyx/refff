@@ -4,6 +4,7 @@
  */
 
 import 'antd/dist/antd.css';
+import '@/lib/antd/settings';
 
 import * as serviceWorker from './serviceWorker';
 

@@ -1,32 +1,36 @@
 import { Ctx, Provider } from './ctx';
-import React, { FC, useEffect } from 'react';
+import { FormConfig, FormProps } from '@refff/core';
+import React, { FunctionComponent, MutableRefObject, useEffect } from 'react';
 
-import { FormProps } from '@refff/core';
 import _ from 'lodash';
 import { settings } from '../settings';
 
-export type FormConfig = {
-  trigger?: 'onBlur' | 'onChange';
-  editable?: boolean;
-};
-export type Props = {
+export type Props<T> = {
   config?: FormConfig;
-  ctx: Ctx;
+  data: T & { __ctx: MutableRefObject<Ctx> };
 } & FormProps;
 
-const { UI } = settings;
+const { UI } = settings.get();
 
-export const Form: FC<Props> = ({ ctx, config, children }) => {
+interface IForm {
+  <T extends object>(
+    props: Parameters<FunctionComponent<Props<T>>>[0],
+    contenxt: Parameters<FunctionComponent<Props<T>>>[1]
+  ): ReturnType<FunctionComponent<Props<T>>>;
+  displayName?: FunctionComponent<Props<any>>['displayName'];
+}
+
+export const Form: IForm = ({ data, config, children }) => {
   useEffect(() => {
     if (config) {
-      const isEqual = _.isEqual(ctx.config, config);
+      const isEqual = _.isEqual(data.__ctx.current.config, config);
       if (!isEqual) {
-        ctx.config = config;
+        data.__ctx.current.config = config;
       }
     }
   }, [config]);
   return (
-    <Provider value={ctx}>
+    <Provider value={data.__ctx.current}>
       <UI.Form>{children}</UI.Form>
     </Provider>
   );

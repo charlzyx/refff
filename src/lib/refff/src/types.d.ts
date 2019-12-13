@@ -39,7 +39,7 @@ export declare module '@refff/core' {
 
   export interface Events {
     on: {
-      debug: (fn: (...args: any[]) => void) => void;
+      debug: (fn: (type: any, e: any) => void) => void;
       change: (fn: Event.change) => Disposer;
       reset: (fn: Event.reset) => Disposer;
       clean: (fn: Event.clean) => Disposer;
@@ -89,5 +89,14 @@ export declare module '@refff/core' {
     to?: Pipe[];
     by?: Pipe[];
     order?: PipeOrder;
+  };
+
+  export type FormConfig = {
+    trigger?: 'onBlur' | 'onChange';
+    editable?: boolean;
+  };
+
+  export type DeepReadonly<T> = {
+    [P in keyof T]: DeepReadonly<T[P]>;
   };
 }

@@ -15,7 +15,7 @@ type Validator = (
 
 const Empty: FC = () => null;
 
-const settings: {
+const config: {
   UI: UI;
   validator: Validator;
   pipe: Required<PipeConfig>;
@@ -42,21 +42,36 @@ const settings: {
 };
 
 export type LinkConfig = {
-  pipe?: typeof settings['pipe'];
-  map?: typeof settings['map'];
+  pipe?: typeof config['pipe'];
+  map?: typeof config['map'];
 };
 
 const link = <T extends ElementType>(
   el: T & LinkConfig,
-  config?: LinkConfig
+  conf?: LinkConfig
 ): T & Readonly<LinkConfig> => {
-  if (config?.map) {
-    el.map = config.map;
+  if (conf?.map) {
+    el.map = conf.map;
   }
-  if (config?.pipe) {
-    el.pipe = config.pipe;
+  if (conf?.pipe) {
+    el.pipe = conf.pipe;
   }
   return el;
 };
+
+type Config = typeof config;
+
+const set = {
+  UI: {
+    Form: (el: Config['UI']['Form']) => (config.UI.Form = el),
+    Field: (el: Config['UI']['Field']) => (config.UI.Field = el),
+    Notice: (el: Config['UI']['Notice']) => (config.UI.Notice = el)
+  },
+  validator: (v: Config['validator']) => (config.validator = v),
+  pipe: (p: Config['pipe']) => (config.pipe = p),
+  map: (m: Config['map']) => (config.map = m)
+};
+
+const settings = { get: () => config, set };
 
 export { settings, link };
