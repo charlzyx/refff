@@ -83,7 +83,8 @@ type Pool = {
   cache: { [id: string]: Events };
   get: (id: string) => Events;
 };
-const pool: Pool = {
+
+export const pool: Pool = {
   cache: {},
   get(id: string) {
     if (this.cache[id]) {
@@ -97,6 +98,7 @@ const pool: Pool = {
 const disposer: {
   [id: string]: Function[];
 } = {};
+
 export const dying = (id: string, ...args: Function[]) => {
   if (!disposer[id]) {
     disposer[id] = [];
@@ -110,5 +112,3 @@ export const dying = (id: string, ...args: Function[]) => {
     });
   };
 };
-
-export default pool;

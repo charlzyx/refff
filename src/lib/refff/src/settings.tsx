@@ -1,41 +1,10 @@
 import { ElementType, FC, MutableRefObject } from 'react';
-import { Rule, ValidateStatus } from '@refff/core';
-
-import { getEventValue } from './helpers';
-
-type Overrides<T> = {
-  value: T;
-  onChange: (v: T) => T;
-  onBlur: <E extends any>(e: E) => E;
-  editable: boolean | undefined;
-  valid: ValidateStatus;
-  help: string;
-};
-
-export const link = <
-  T extends any = any,
-  P extends object = Record<string, any>
->(
-  props: P,
-  overrides: Overrides<T>
-) => {
-  // 这怎么能做成 pipe 啊
-  const oc = overrides.onChange;
-  const onChange = (v: any) => {
-    return oc(getEventValue(v));
-  };
-  return {
-    ...props,
-    ...overrides,
-    onChange
-  };
-};
-
-export type Link = typeof link;
+import { FieldMapping, PipeConfig, Rule } from '@refff/core';
 
 type UI = {
   Form: ElementType;
   Field: ElementType;
+  Notice: ElementType;
 };
 
 type Validator = (
@@ -49,17 +18,45 @@ const Empty: FC = () => null;
 const settings: {
   UI: UI;
   validator: Validator;
-  link: Link;
+  pipe: Required<PipeConfig>;
+  map: Required<FieldMapping>;
 } = {
   UI: {
     Form: Empty,
-    Field: Empty
+    Field: Empty,
+    Notice: Empty
   },
   validator: rules => {
     if (!rules) return;
     throw new Error('settings.validator missed');
   },
-  link: link
+  pipe: { to: [], by: [], order: ['default', 'static', 'props'] },
+  map: {
+    value: 'value',
+    onChange: 'onChange',
+    onBlur: 'onBlur',
+    editable: 'editable',
+    valid: 'valid',
+    help: 'help'
+  }
 };
 
-export { settings };
+export type LinkConfig = {
+  pipe?: typeof settings['pipe'];
+  map?: typeof settings['map'];
+};
+
+const link = <T extends ElementType>(
+  el: T & LinkConfig,
+  config?: LinkConfig
+): T & Readonly<LinkConfig> => {
+  if (config?.map) {
+    el.map = config.map;
+  }
+  if (config?.pipe) {
+    el.pipe = config.pipe;
+  }
+  return el;
+};
+
+export { settings, link };

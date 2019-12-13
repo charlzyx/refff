@@ -3,7 +3,7 @@ import React, { FC, useEffect } from 'react';
 
 import { FormProps } from '@refff/core';
 import _ from 'lodash';
-import { settings } from './settings';
+import { settings } from '../settings';
 
 export type FormConfig = {
   trigger?: 'onBlur' | 'onChange';

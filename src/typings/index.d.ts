@@ -11,7 +11,7 @@ export declare module '@refff/core' {
   export interface Rule extends RuleItem{};
 
   export interface FormProps extends FormProps{};
-  export interface FiledProps extends FormItemProps{};
+  export interface FieldProps extends FormItemProps{};
   export interface NoticeProps {
     nothing: string;
   }

@@ -1,6 +1,12 @@
 /* eslint-disable no-console */
-import { Event, FiledProps, Rule, ValidateStatus } from '@refff/core';
-import { Link, settings } from './settings';
+import {
+  Event,
+  FieldMapping,
+  FieldProps,
+  PipeConfig,
+  Rule,
+  ValidateStatus
+} from '@refff/core';
 import React, {
   FC,
   ReactElement,
@@ -11,14 +17,22 @@ import React, {
   useRef,
   useState
 } from 'react';
-import { isPathContain, promisify } from './helpers';
-import pool, { dying } from './pool';
+import {
+  dying,
+  flush,
+  isPathContain,
+  merge,
+  pool,
+  promisify,
+  remapping
+} from '../utils';
 
 import { Ctx } from './ctx';
 import _ from 'lodash';
-import { useRefState } from './hooks';
+import { settings } from '../settings';
+import { useRefState } from '../utils/useRefState';
 
-const { UI, validator, link: defaultLink } = settings;
+const { UI, validator } = settings;
 
 const notReady = () => Promise.resolve();
 
@@ -31,9 +45,10 @@ type Base = {
   children: ReactElement | ((props: object) => ReactElement);
   editable?: boolean;
   rules?: Rule | Rule[];
-  link?: Link;
+  pipe?: PipeConfig;
+  map?: FieldMapping;
   label?: string;
-} & Omit<FiledProps, 'children'>;
+} & Omit<FieldProps, 'children'>;
 
 type WithPath = {
   path: any;
@@ -53,7 +68,8 @@ export const Field: FC<Props> = ({
   trigger,
   rules,
   editable,
-  link,
+  pipe,
+  map,
   ...others
 }) => {
   const uid = useRef(_.uniqueId('fff_filed'));
@@ -181,40 +197,41 @@ export const Field: FC<Props> = ({
     }
   }, [valid]);
 
-  const overChange = useCallback((next: typeof value) => {
+  const emitChange = useCallback(next => {
     doChange(next);
     return next;
   }, []);
 
-  const overBlur = useCallback(e => {
+  const childProps = (children as ReactElement).props || {};
+
+  const emitBlur = useCallback(e => {
+    const ob = childProps.onBlur;
+    if (typeof ob === 'function') {
+      ob(e);
+    }
     if (finalTrigger === 'onBlur') {
       doValidate();
     }
     return e;
   }, []);
 
-  const childProps = (children as ReactElement).props || {};
-  const rides = {
-    value,
-    onChange: overChange,
-    onBlur: overBlur,
+  const statics = ((children && (children as ReactElement).type) ||
+    {}) as typeof settings;
+  const mapping = merge.mapping(settings.map, statics.map, map);
+  const pipes = merge.pipe(settings.pipe, statics.pipe, pipe);
+  const toPipes = pipes.to.concat(emitChange);
+  const waitOverrides = {
+    value: flush(toPipes, value),
+    onChange: (x: any) => flush(pipes.by, x),
+    onBlur: emitBlur,
     editable: finalEditable,
     valid,
     help
   };
-  const childrenStaticLink =
-    children && (children as any).type && (children as any).type.link;
-
-  const defaultOver = defaultLink(childProps, rides);
-  const staticOver = childrenStaticLink
-    ? childrenStaticLink(childProps, defaultOver)
-    : defaultOver;
-  const propsOver = link ? link(childProps, staticOver) : staticOver;
 
   const overrides = {
-    ...defaultOver,
-    ...staticOver,
-    ...propsOver
+    ...childProps,
+    ...remapping(waitOverrides, mapping)
   };
 
   if (typeof children === 'function') {

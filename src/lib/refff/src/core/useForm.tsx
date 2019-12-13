@@ -1,7 +1,6 @@
-/* eslint-disable no-console */
 import { Event, ValidateStatus } from '@refff/core';
 import { Patch, applyPatches, produce } from 'immer';
-import pool, { dying } from './pool';
+import { dying, pool } from '../utils';
 import { useCallback, useEffect, useRef } from 'react';
 
 import { Ctx } from './ctx';
@@ -114,10 +113,12 @@ export const useForm = <T extends object>(init: T) => {
 
   // 事件的注册与销毁
   useEffect(() => {
-    // on.debug((...args) => {
-    //   console.log(data);
-    //   console.log(args);
-    // });
+    on.debug((...args) => {
+      // eslint-disable-next-line no-console
+      console.log(data);
+      // eslint-disable-next-line no-console
+      console.log(args);
+    });
     const godie = dying(
       uid.current,
       on.change(onChange),
