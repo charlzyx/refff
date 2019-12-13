@@ -4,16 +4,14 @@ import { dying, isValid, pool } from '../utils';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Ctx } from './ctx';
-import { Diff } from 'utility-types';
 import _ from 'lodash';
 
 const pass = <T extends object>(x: T) => x;
-
-export const useForm = <T extends object, R extends T>(
+export const useForm = <T extends object, R extends object>(
   init: T,
+  effect?: (data: T, type: Effects, e?: any) => void,
   pipein?: (data: T) => R,
-  pipeout?: (next: R) => T,
-  effect?: (data: T, type: Effects, e?: any) => void
+  pipeout?: (next: R) => T
 ) => {
   const uid = useRef(_.uniqueId('fff_form'));
   const done = pipein ? pipein(init) : [init, pass];
@@ -69,7 +67,7 @@ export const useForm = <T extends object, R extends T>(
         });
       });
       data.current = next as T;
-      return pipeout ? pipeout(next as R) : next;
+      return pipeout ? pipeout(next as any) : next;
     },
     [emit, pipeout]
   );
@@ -109,7 +107,7 @@ export const useForm = <T extends object, R extends T>(
       } else {
         return Promise.all(checkerQueue.current.map(c => c.runner())).then<T>(
           () => {
-            const real = pipeout ? pipeout(data.current as R) : data.current;
+            const real = pipeout ? pipeout(data.current as any) : data.current;
             return real as T;
           }
         );
@@ -147,7 +145,7 @@ export const useForm = <T extends object, R extends T>(
   useEffect(() => {
     on.debug((type, e) => {
       if (typeof effect === 'function') {
-        const next = pipeout ? pipeout(data.current as R) : data.current;
+        const next = pipeout ? pipeout(data.current as any) : data.current;
         effect(next, type, e);
       }
     });

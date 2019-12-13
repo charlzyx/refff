@@ -16,14 +16,15 @@ const App = () => {
       start: '',
       end: ''
     },
+    (...args) => {
+      console.log('somthing', args);
+    },
     dd => {
       return { ...dd, range: [dd.start, dd.end] };
     },
     next => {
+      delete next.range;
       return next;
-    },
-    (...args) => {
-      console.log('somthing', args);
     }
   );
 
@@ -35,6 +36,9 @@ const App = () => {
           <Input></Input>
         </Field>
         <Field label="World" __path="b.c.d">
+          <Input></Input>
+        </Field>
+        <Field label="World" __path="range">
           <Input></Input>
         </Field>
       </Form>

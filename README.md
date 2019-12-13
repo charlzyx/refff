@@ -1,2 +1,2 @@
-# Re(act) F(inal) F(antasy) F(orm)
-> 最终幻想
+# React Final Fantasy Form
+> React's 最终の幻想 ✕ 表单
