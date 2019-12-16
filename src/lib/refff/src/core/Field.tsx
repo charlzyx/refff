@@ -1,10 +1,10 @@
 /* eslint-disable no-console */
 import {
   Event,
-  FieldMapping,
   FieldProps,
-  PipeConfig,
   Rule,
+  TFieldMeta,
+  TPipeConfig,
   ValidateStatus
 } from '@refff/core';
 import React, {
@@ -40,36 +40,36 @@ type OneOf<T, U> =
   | ({ [P in keyof T]?: never } & U)
   | ({ [P in keyof U]?: never } & T);
 
-type Base = {
+type TBase = {
   trigger?: 'onBlur' | 'onChange';
   children: ReactElement | ((props: object) => ReactElement);
   editable?: boolean;
   rules?: Rule | Rule[];
-  pipe?: PipeConfig;
-  map?: FieldMapping;
+  pipe?: TPipeConfig;
+  meta?: TFieldMeta;
   label?: string;
 } & Omit<FieldProps, 'children'>;
 
-type WithPath = {
+type TWithPath = {
   path: any;
 };
 
-type WithUnderPath = {
+type TWithUnderPath = {
   __path: string;
 };
 
-type WithoutPath = {};
+type TWithoutPath = {};
 
-type Props = OneOf<WithPath, OneOf<WithUnderPath, WithoutPath>> & Base;
+type TProps = OneOf<TWithPath, OneOf<TWithUnderPath, TWithoutPath>> & TBase;
 
-export const Field: FC<Props> = ({
+export const Field: FC<TProps> = ({
   children,
   __path = '',
   trigger,
   rules,
   editable,
   pipe,
-  map,
+  meta,
   ...others
 }) => {
   const uid = useRef(_.uniqueId('fff_filed'));
@@ -237,11 +237,11 @@ export const Field: FC<Props> = ({
 
   const statics = ((children && (children as ReactElement).type) ||
     {}) as ReturnType<typeof settings.get>;
-  const mapping = merge.mapping(settings.get().map, statics.map, map);
+  const mapping = merge.mapping(settings.get().meta, statics.meta, meta);
   const pipes = merge.pipe(settings.get().pipe, statics.pipe, pipe);
-  const byPipes = pipes.by.concat(emitChange);
+  const byPipes = pipes.c2v.concat(emitChange);
   const waitOverrides = {
-    value: flush(value, pipes.to),
+    value: flush(value, pipes.v2c),
     onChange: (x: any) => flush(x, byPipes),
     onBlur: emitBlur,
     editable: finalEditable,

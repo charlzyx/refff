@@ -1,4 +1,4 @@
-import { FieldMapping, Pipe, PipeConfig } from '@refff/core';
+import { Pipe, TFieldMeta, TPipeConfig } from '@refff/core';
 
 const isEmpty = (x: any) => {
   if (Array.isArray(x)) return x.length === 0;
@@ -6,60 +6,60 @@ const isEmpty = (x: any) => {
 };
 
 const pipe = (
-  defaults: Required<PipeConfig>,
-  statics: PipeConfig = {},
-  props: PipeConfig = {}
-): Required<PipeConfig> => {
+  defaults: Required<TPipeConfig>,
+  statics: TPipeConfig = {},
+  props: TPipeConfig = {}
+): Required<TPipeConfig> => {
   // props.order > statics.order > defaults.order
-  const order: Required<PipeConfig>['order'] =
+  const order: Required<TPipeConfig>['order'] =
     (isEmpty(props.order)
       ? isEmpty(statics.order)
         ? defaults.order
         : statics.order
       : props.order) || [];
   const pipes = {
-    to: [] as Pipe[],
-    by: [] as Pipe[]
+    v2c: [] as Pipe[],
+    c2v: [] as Pipe[]
   };
 
   order.forEach(key => {
     switch (key) {
       case 'props':
-        pipes.to =
-          Array.isArray(props.to) && !isEmpty(props.to)
-            ? pipes.to.concat(props.to)
-            : pipes.to;
-        pipes.by =
-          Array.isArray(props.by) && !isEmpty(props.by)
-            ? pipes.by.concat(props.by)
-            : pipes.by;
+        pipes.v2c =
+          Array.isArray(props.v2c) && !isEmpty(props.v2c)
+            ? pipes.v2c.concat(props.v2c)
+            : pipes.v2c;
+        pipes.c2v =
+          Array.isArray(props.c2v) && !isEmpty(props.c2v)
+            ? pipes.c2v.concat(props.c2v)
+            : pipes.c2v;
         break;
       case 'static':
-        pipes.to =
-          Array.isArray(statics.to) && !isEmpty(statics.to)
-            ? pipes.to.concat(statics.to)
-            : pipes.to;
-        pipes.by =
-          Array.isArray(statics.by) && !isEmpty(statics.by)
-            ? pipes.by.concat(statics.by)
-            : pipes.by;
+        pipes.v2c =
+          Array.isArray(statics.v2c) && !isEmpty(statics.v2c)
+            ? pipes.v2c.concat(statics.v2c)
+            : pipes.v2c;
+        pipes.c2v =
+          Array.isArray(statics.c2v) && !isEmpty(statics.c2v)
+            ? pipes.c2v.concat(statics.c2v)
+            : pipes.c2v;
         break;
       case 'default':
-        pipes.to =
-          Array.isArray(defaults.to) && !isEmpty(defaults.to)
-            ? pipes.to.concat(defaults.to)
-            : pipes.to;
-        pipes.by =
-          Array.isArray(defaults.by) && !isEmpty(defaults.by)
-            ? pipes.by.concat(defaults.by)
-            : pipes.by;
+        pipes.v2c =
+          Array.isArray(defaults.v2c) && !isEmpty(defaults.v2c)
+            ? pipes.v2c.concat(defaults.v2c)
+            : pipes.v2c;
+        pipes.c2v =
+          Array.isArray(defaults.c2v) && !isEmpty(defaults.c2v)
+            ? pipes.c2v.concat(defaults.c2v)
+            : pipes.c2v;
         break;
     }
   });
 
   return {
-    to: pipes.to,
-    by: pipes.by,
+    v2c: pipes.v2c,
+    c2v: pipes.c2v,
     order
   };
 };
@@ -67,10 +67,10 @@ const pipe = (
 const isObject = (x: any) =>
   Object.prototype.toString.call(x) === '[object Object]';
 const mapping = (
-  defaults: Required<FieldMapping>,
-  ...mappings: (FieldMapping | void)[]
-): Required<FieldMapping> => {
-  return mappings.reduce<Required<FieldMapping>>((map, m) => {
+  defaults: Required<TFieldMeta>,
+  ...mappings: (TFieldMeta | void)[]
+): Required<TFieldMeta> => {
+  return mappings.reduce<Required<TFieldMeta>>((map, m) => {
     if (isObject(m)) {
       return { ...map, ...m };
     }

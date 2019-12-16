@@ -3,7 +3,7 @@ import { Patch, applyPatches, produce } from 'immer';
 import { dying, isValid, pool } from '../utils';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Ctx } from './ctx';
+import { TCtx } from './ctx';
 import _ from 'lodash';
 
 const pass = <T extends object>(x: T) => x;
@@ -21,7 +21,7 @@ export const useForm = <T extends object, R extends object>(
   const pathMap = useRef<PathMap>({});
   const checkerQueue = useRef<{ vid: string; runner: Event.validator }[]>([]);
 
-  const ctx = useRef<Ctx>({
+  const ctx = useRef<TCtx>({
     config: {},
     data: data,
     fid: uid.current

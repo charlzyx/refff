@@ -1,5 +1,5 @@
 import { ElementType, FC, MutableRefObject } from 'react';
-import { FieldMapping, PipeConfig, Rule } from '@refff/core';
+import { Rule, TFieldMeta, TPipeConfig } from '@refff/core';
 
 type UI = {
   Form: ElementType;
@@ -18,8 +18,8 @@ const Empty: FC = () => null;
 const config: {
   UI: UI;
   validator: Validator;
-  pipe: Required<PipeConfig>;
-  map: Required<FieldMapping>;
+  pipe: Required<TPipeConfig>;
+  meta: Required<TFieldMeta>;
 } = {
   UI: {
     Form: Empty,
@@ -30,8 +30,8 @@ const config: {
     if (!rules) return;
     throw new Error('settings.validator missed');
   },
-  pipe: { to: [], by: [], order: ['default', 'static', 'props'] },
-  map: {
+  pipe: { v2c: [], c2v: [], order: ['default', 'static', 'props'] },
+  meta: {
     value: 'value',
     onChange: 'onChange',
     onBlur: 'onBlur',
@@ -43,15 +43,15 @@ const config: {
 
 export type LinkConfig = {
   pipe?: typeof config['pipe'];
-  map?: typeof config['map'];
+  meta?: typeof config['meta'];
 };
 
 const link = <T extends ElementType>(
   el: T & LinkConfig,
   conf?: LinkConfig
 ): T & Readonly<LinkConfig> => {
-  if (conf?.map) {
-    el.map = conf.map;
+  if (conf?.meta) {
+    el.meta = conf.meta;
   }
   if (conf?.pipe) {
     el.pipe = conf.pipe;
@@ -69,7 +69,7 @@ const set = {
   },
   validator: (v: Config['validator']) => (config.validator = v),
   pipe: (p: Config['pipe']) => (config.pipe = p),
-  map: (m: Config['map']) => (config.map = m)
+  meta: (m: Config['meta']) => (config.meta = m)
 };
 
 const settings = { get: () => config, set };

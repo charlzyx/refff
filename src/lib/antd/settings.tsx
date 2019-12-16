@@ -22,8 +22,8 @@ settings.set.validator((ref, rule, label = '') => {
   return checker.validate(waitValidate);
 });
 settings.set.pipe({
-  to: [],
-  by: [
+  v2c: [],
+  c2v: [
     x => {
       if (isEvent(x)) return x.target.value;
       return x;

@@ -57,7 +57,7 @@ export declare module '@refff/core' {
     };
   }
 
-  export type FieldMapping = {
+  export type TFieldMeta = {
     value?: string;
     onChange?: string;
     onBlur?: string;
@@ -84,11 +84,11 @@ export declare module '@refff/core' {
     | [T3, T1, T2]
     | [T3, T2, T1];
 
-  export type PipeOrder = Combin<'default', 'static', 'props'>;
-  export type PipeConfig = {
-    to?: Pipe[];
-    by?: Pipe[];
-    order?: PipeOrder;
+  export type TPipeOrder = Combin<'default', 'static', 'props'>;
+  export type TPipeConfig = {
+    v2c?: Pipe[];
+    c2v?: Pipe[];
+    order?: TPipeOrder;
   };
 
   export type FormConfig = {
