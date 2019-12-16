@@ -43,7 +43,7 @@ const App = () => {
         <Field label="World" __path="b.c.d">
           <Input></Input>
         </Field>
-        <Field label="World" __path="range">
+        <Field computed={[data.start, data.end]} label="datarange">
           <Input></Input>
         </Field>
       </Form>
