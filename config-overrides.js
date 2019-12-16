@@ -13,12 +13,11 @@ module.exports = override(
     libraryDirectory: 'es',
     style: false
   }),
-  // addBabelPlugin([
-  //   './lib/babel-plugin-transform-react-jsx-path-to-__path',
-  //   {
-  //     include: /Field|Watch/
-  //   }
-  // ]),
+  addBabelPlugin([
+    './lib/babel/transform-refff', {
+      include: /Form|Field/,
+    }
+  ]),
   addBabelPlugin(['lodash']),
   addBabelPlugin(['@babel/plugin-proposal-optional-chaining']),
   addWebpackAlias({

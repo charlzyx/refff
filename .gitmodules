@@ -1,0 +1,3 @@
+[submodule "lib/babel/transform-refff"]
+	path = lib/babel/transform-refff
+	url = git@git.corp.relxtech.com:fe/plugin-transform-react-jsx-refff.git

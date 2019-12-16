@@ -22,7 +22,7 @@ export declare module '@refff/core' {
     /** Field <-> useForm 双向数据变更 */
     type change = (event: {
       next: any;
-      path: string | number | (string | number)[];
+      path: Path | Path[];
       source: string;
     }) => void;
     /** Filed -> useForm 挂载 */
@@ -65,7 +65,7 @@ export declare module '@refff/core' {
     valid?: string;
     help?: string;
   };
-  export type Pipe = (value: any) => any;
+  export type Pipe = (value: any, props: any) => any;
   export type Combin<T1, T2, T3> =
     | []
     | [T1]
@@ -103,6 +103,8 @@ export declare module '@refff/core' {
   export type ValidMap = {
     [vid: string]: ValidateStatus;
   };
+
+  export type Path = string | number;
 
   export type PathMap = {
     [vid: string]: string;

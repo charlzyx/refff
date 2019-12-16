@@ -1,4 +1,4 @@
-import { Button, Input } from '@/lib/antd';
+import { Button, Input, RangePicker } from '@/lib/antd';
 import { Field, Form, useForm } from '@refff/core';
 /* eslint-disable no-console */
 import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
@@ -10,41 +10,30 @@ const init = {
       d: 2
     }
   },
-  start: '',
-  end: ''
-};
-
-const converter = (data: typeof init) => {
-  return { ...data, range: [data.start, data.end] };
-};
-
-const recovery = (next: ReturnType<typeof converter>) => {
-  delete next.range;
-  return next;
+  start: '2019-10-20',
+  end: '2019-12-10'
 };
 
 const App = () => {
   const { data, clean, valid, put, checking, reset } = useForm(
     init,
     (...args) => {
-      // console.log('somthing', args);
-    },
-    converter,
-    recovery
+      console.table(args);
+    }
   );
 
   return (
     <div>
       <Form data={data}>
         <div>{valid ? 'valid' : 'notvalid'}</div>
-        <Field label="Hello" __path="a">
+        <Field label="Hello" path={data.a}>
           <Input></Input>
         </Field>
-        <Field label="World" __path="b.c.d">
+        <Field label="World" path="b.c.d">
           <Input></Input>
         </Field>
-        <Field computed={[data.start, data.end]} label="datarange">
-          <Input></Input>
+        <Field path={[data.start, data.end]} label="datarange">
+          <RangePicker format="YYYY-MM-DD HH:mm:ss"></RangePicker>
         </Field>
       </Form>
     </div>

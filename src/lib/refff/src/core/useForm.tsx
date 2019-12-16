@@ -6,16 +6,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { TCtx } from './ctx';
 import _ from 'lodash';
 
-const pass = <T extends object>(x: T) => x;
-export const useForm = <T extends object, R extends object>(
+export const useForm = <T extends object>(
   init: T,
-  effect?: (data: T, type: Effects, e?: any) => void,
-  convert?: (data: T) => R,
-  recovery?: (next: R) => T
+  effect?: (data: T, type: Effects, e?: any) => void
 ) => {
   const uid = useRef(_.uniqueId('fff_form'));
-  const done = convert ? convert(init) : [init, pass];
-  const data = useRef<T>(done as T);
+  const data = useRef<T>(init);
   const [valid, setValid] = useState(false);
   const validMap = useRef<ValidMap>({});
   const pathMap = useRef<PathMap>({});
@@ -78,9 +74,9 @@ export const useForm = <T extends object, R extends object>(
         });
       });
       data.current = next as T;
-      return recovery ? recovery(next as any) : next;
+      return next;
     },
-    [emit, recovery]
+    [emit]
   );
 
   const doReset = useCallback(
@@ -104,30 +100,24 @@ export const useForm = <T extends object, R extends object>(
     [emit]
   );
 
-  const doChecking = useCallback(
-    (path?: string) => {
-      if (path) {
-        const checker = checkerQueue.current.find(
-          c => pathMap.current[c.vid] === path
-        );
-        if (checker && typeof checker.runner === 'function') {
-          return checker.runner().then(() => _.get(data.current, path));
-        } else {
-          return Promise.resolve(_.get(data.current, path));
-        }
+  const doChecking = useCallback((path?: string) => {
+    if (path) {
+      const checker = checkerQueue.current.find(
+        c => pathMap.current[c.vid] === path
+      );
+      if (checker && typeof checker.runner === 'function') {
+        return checker.runner().then(() => _.get(data.current, path));
       } else {
-        return Promise.all(checkerQueue.current.map(c => c.runner())).then<T>(
-          () => {
-            const real = recovery
-              ? recovery(data.current as any)
-              : data.current;
-            return real as T;
-          }
-        );
+        return Promise.resolve(_.get(data.current, path));
       }
-    },
-    [recovery]
-  );
+    } else {
+      return Promise.all(checkerQueue.current.map(c => c.runner())).then<T>(
+        () => {
+          return data.current;
+        }
+      );
+    }
+  }, []);
 
   // 监听者们
 
@@ -168,8 +158,7 @@ export const useForm = <T extends object, R extends object>(
   useEffect(() => {
     on.debug((type, e) => {
       if (typeof effect === 'function') {
-        const next = recovery ? recovery(data.current as any) : data.current;
-        effect(next, type, e);
+        effect(data.current, type, e);
       }
     });
     const godie = dying(
@@ -196,7 +185,7 @@ export const useForm = <T extends object, R extends object>(
       }
       return Reflect.get(target.current, key);
     }
-  }) as DeepReadonly<R & { __ctx: typeof ctx }>;
+  }) as DeepReadonly<T & { __ctx: typeof ctx }>;
 
   type OverChecking = {
     (path: string): Promise<Partial<T>>;

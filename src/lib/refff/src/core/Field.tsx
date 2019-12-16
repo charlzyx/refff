@@ -2,6 +2,7 @@
 import {
   Event,
   FieldProps,
+  Path,
   Rule,
   TFieldMeta,
   TPipeConfig,
@@ -20,7 +21,7 @@ import React, {
 import {
   dying,
   flush,
-  isPathContain,
+  isMatch,
   merge,
   pool,
   promisify,
@@ -54,28 +55,63 @@ type TWithPath = {
   path: any;
 };
 
-type TWithUnderPath = {
-  __path: string;
+type TWithComputed = {
+  computed: any;
 };
 
-type TWithoutPath = {};
+type TProctedProps = {
+  value: never;
+};
 
-type TProps = OneOf<TWithPath, OneOf<TWithUnderPath, TWithoutPath>> & TBase;
+type TProps = OneOf<TWithPath, OneOf<TWithComputed, TProctedProps>> & TBase;
 
-export const Field: FC<TProps> = ({
-  children,
-  __path = '',
-  trigger,
-  rules,
-  editable,
-  pipe,
-  meta,
-  ...others
-}) => {
+const getValueByPath = (data: any, path: Path | [Path, Path][]) => {
+  if (!Array.isArray(path)) return _.get(data, path);
+  const isArray = typeof path[0][0] === 'number';
+  // 创建初始对象
+  const value: any = isArray ? [] : {};
+  path.forEach(pair => {
+    const [p1, p2] = pair;
+    value[p1] = _.get(data, p2);
+  });
+  return value;
+};
+
+const getDepsByPath = (path: Path | [Path, Path][]) => {
+  if (Array.isArray(path)) {
+    return path.map(pair => pair[1] as string);
+  } else {
+    return path;
+  }
+};
+
+const isDepsMatched = (path: Path | Path[], deps: Path | Path[]) => {
+  if (Array.isArray(deps)) {
+    return deps.find(dep => isMatch(dep, path));
+  } else {
+    return isMatch(deps, path);
+  }
+};
+
+export const Field: FC<TProps> = props => {
+  const {
+    children,
+    path: __path = '',
+    trigger,
+    rules,
+    editable,
+    pipe,
+    meta,
+    ...others
+  } = props;
+  console.log('__path', __path);
   const uid = useRef(_.uniqueId('fff_filed'));
   const { fid, data, config } = useContext(Ctx);
   const { emit, on } = pool.get(fid);
-  const [value, setValue, valueRef] = useRefState(_.get(data.current, __path));
+  const [value, setValue, valueRef] = useRefState(
+    getValueByPath(data.current, __path)
+  );
+  console.log('value', value);
   const [help, setHelp] = useState('');
   const [valid, setValidStatus] = useState<ValidateStatus>('init');
   const race = useRef(0);
@@ -88,10 +124,26 @@ export const Field: FC<TProps> = ({
   const doChange = useCallback(
     (next: typeof value) => {
       setValue(next);
-      emit.change({ next, path: __path, source: uid.current });
+      // const deps = getDepsByPath(__path);
+      if (Array.isArray(__path)) {
+        __path.forEach(pair => {
+          emit.change({
+            next: _.get(next, pair[0]),
+            path: pair[1],
+            source: uid.current
+          });
+        });
+      } else {
+        emit.change({
+          next,
+          path: __path,
+          source: uid.current
+        });
+      }
     },
     [__path, emit, setValue, value]
   );
+
   const doValidate = useCallback<Event.validator>(() => {
     setValidStatus('validating');
     const count = race.current++;
@@ -144,20 +196,27 @@ export const Field: FC<TProps> = ({
   // 监听者们
   const onChange = useCallback<Event.change>(
     ({ next, path, source }) => {
-      console.log('source', { value, path, source });
       if (source === uid.current) return;
-      // const next = _.get(data.current, __path);
-      if (isPathContain(__path, path) && next !== value) {
-        setValue(next);
+      const deps = getDepsByPath(__path);
+      if (Array.isArray(deps)) {
+        const isMatch = isDepsMatched(path, deps);
+        if (isMatch) {
+          setValue(getValueByPath(data.current, __path));
+        }
+      } else {
+        if (isMatch(__path, path) && next !== value) {
+          setValue(next);
+        }
       }
     },
-    [__path, setValue, value]
+    [__path, data, setValue, value]
   );
   const onReset = useCallback<Event.reset>(
     ({ path }) => {
-      const should = !path || path === __path;
+      const deps = getDepsByPath(__path);
+      const should = !path || isDepsMatched(path, deps);
       if (should) {
-        setValue(_.get(data.current, __path));
+        setValue(getValueByPath(data.current, __path));
         setValidStatus('init');
       }
     },
@@ -165,7 +224,8 @@ export const Field: FC<TProps> = ({
   );
   const onClean = useCallback<Event.clean>(
     ({ path }) => {
-      const should = !path || path === __path;
+      const deps = getDepsByPath(__path);
+      const should = !path || isDepsMatched(path, deps);
       if (should) {
         setValidStatus('init');
       }
@@ -175,13 +235,17 @@ export const Field: FC<TProps> = ({
 
   // 事件的注册与销毁
   useEffect(() => {
+    const deps = getDepsByPath(__path);
     emit.mounted({
       vid: uid.current,
-      path: __path,
+      // 注意!! 这里会影响 dochecking, 比如要校验时间段, 就只能用
+      // checking('start') 来校验这个动态字段
+      path: Array.isArray(deps) ? deps[0] : (deps as string),
       checker: () => {
         return checkerRef.current();
       }
     });
+
     const godie = dying(
       uid.current,
       on.change(onChange),
@@ -199,7 +263,7 @@ export const Field: FC<TProps> = ({
     if (finalTrigger === 'onChange') {
       doValidate();
     }
-  }, [doValidate, finalTrigger, value]);
+  }, [doValidate, finalTrigger]);
 
   useEffect(() => {
     checkerRef.current = doValidate;
@@ -213,6 +277,7 @@ export const Field: FC<TProps> = ({
 
   const emitChange = useCallback(
     next => {
+      console.log('next', next);
       doChange(next);
       return next;
     },
@@ -241,8 +306,8 @@ export const Field: FC<TProps> = ({
   const pipes = merge.pipe(settings.get().pipe, statics.pipe, pipe);
   const byPipes = pipes.c2v.concat(emitChange);
   const waitOverrides = {
-    value: flush(value, pipes.v2c),
-    onChange: (x: any) => flush(x, byPipes),
+    value: flush(value, childProps, pipes.v2c),
+    onChange: (x: any) => flush(x, childProps, byPipes),
     onBlur: emitBlur,
     editable: finalEditable,
     valid,

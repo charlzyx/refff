@@ -1,11 +1,7 @@
+import { Path } from '@refff/core';
 import _ from 'lodash';
 
-type Path = string | number;
-
-export const isPathContain = (
-  shorter: Path | Path[],
-  longer: Path | Path[]
-) => {
+export const isMatch = (shorter: Path | Path[], longer: Path | Path[]) => {
   if (!shorter || !longer) return false;
   if (shorter === longer) return true;
   const short = _.toPath(shorter);

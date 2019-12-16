@@ -42,8 +42,8 @@ const config: {
 };
 
 export type LinkConfig = {
-  pipe?: typeof config['pipe'];
-  meta?: typeof config['meta'];
+  pipe?: Partial<typeof config['pipe']>;
+  meta?: Partial<typeof config['meta']>;
 };
 
 const link = <T extends ElementType>(
