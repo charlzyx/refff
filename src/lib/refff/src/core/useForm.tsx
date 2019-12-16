@@ -10,11 +10,11 @@ const pass = <T extends object>(x: T) => x;
 export const useForm = <T extends object, R extends object>(
   init: T,
   effect?: (data: T, type: Effects, e?: any) => void,
-  pipein?: (data: T) => R,
-  pipeout?: (next: R) => T
+  convert?: (data: T) => R,
+  recovery?: (next: R) => T
 ) => {
   const uid = useRef(_.uniqueId('fff_form'));
-  const done = pipein ? pipein(init) : [init, pass];
+  const done = convert ? convert(init) : [init, pass];
   const data = useRef<T>(done as T);
   const [valid, setValid] = useState(false);
   const validMap = useRef<ValidMap>({});
@@ -78,9 +78,9 @@ export const useForm = <T extends object, R extends object>(
         });
       });
       data.current = next as T;
-      return pipeout ? pipeout(next as any) : next;
+      return recovery ? recovery(next as any) : next;
     },
-    [emit, pipeout]
+    [emit, recovery]
   );
 
   const doReset = useCallback(
@@ -118,13 +118,15 @@ export const useForm = <T extends object, R extends object>(
       } else {
         return Promise.all(checkerQueue.current.map(c => c.runner())).then<T>(
           () => {
-            const real = pipeout ? pipeout(data.current as any) : data.current;
+            const real = recovery
+              ? recovery(data.current as any)
+              : data.current;
             return real as T;
           }
         );
       }
     },
-    [pipeout]
+    [recovery]
   );
 
   // 监听者们
@@ -166,7 +168,7 @@ export const useForm = <T extends object, R extends object>(
   useEffect(() => {
     on.debug((type, e) => {
       if (typeof effect === 'function') {
-        const next = pipeout ? pipeout(data.current as any) : data.current;
+        const next = recovery ? recovery(data.current as any) : data.current;
         effect(next, type, e);
       }
     });
@@ -194,7 +196,7 @@ export const useForm = <T extends object, R extends object>(
       }
       return Reflect.get(target.current, key);
     }
-  }) as DeepReadonly<T & R & { __ctx: typeof ctx }>;
+  }) as DeepReadonly<R & { __ctx: typeof ctx }>;
 
   type OverChecking = {
     (path: string): Promise<Partial<T>>;
