@@ -2,7 +2,6 @@
 import {
   Event,
   FieldProps,
-  Path,
   Rule,
   TFieldMeta,
   TPipeConfig,
@@ -21,6 +20,9 @@ import React, {
 import {
   dying,
   flush,
+  getDepsByPath,
+  getValueByPath,
+  isDepsMatched,
   isMatch,
   merge,
   pool,
@@ -64,34 +66,6 @@ type TProctedProps = {
 };
 
 type TProps = OneOf<TWithPath, OneOf<TWithComputed, TProctedProps>> & TBase;
-
-const getValueByPath = (data: any, path: Path | [Path, Path][]) => {
-  if (!Array.isArray(path)) return _.get(data, path);
-  const isArray = typeof path[0][0] === 'number';
-  // 创建初始对象
-  const value: any = isArray ? [] : {};
-  path.forEach(pair => {
-    const [p1, p2] = pair;
-    value[p1] = _.get(data, p2);
-  });
-  return value;
-};
-
-const getDepsByPath = (path: Path | [Path, Path][]) => {
-  if (Array.isArray(path)) {
-    return path.map(pair => pair[1] as string);
-  } else {
-    return path;
-  }
-};
-
-const isDepsMatched = (path: Path | Path[], deps: Path | Path[]) => {
-  if (Array.isArray(deps)) {
-    return deps.find(dep => isMatch(dep, path));
-  } else {
-    return isMatch(deps, path);
-  }
-};
 
 export const Field: FC<TProps> = props => {
   const {
@@ -277,7 +251,6 @@ export const Field: FC<TProps> = props => {
 
   const emitChange = useCallback(
     next => {
-      console.log('next', next);
       doChange(next);
       return next;
     },

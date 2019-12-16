@@ -20,7 +20,6 @@ const events = (id: string): Events => {
         emitter.on('*', fn);
       },
       change(fn) {
-        console.log('onchange');
         emitter.on(types.change, fn);
         return () => {
           emitter.off(types.change, fn);
@@ -83,6 +82,7 @@ const events = (id: string): Events => {
 type Pool = {
   cache: { [id: string]: Events };
   get: (id: string) => Events;
+  remove: (id: string) => void;
 };
 
 export const pool: Pool = {
@@ -93,6 +93,9 @@ export const pool: Pool = {
       this.cache[id] = events(id);
     }
     return this.cache[id];
+  },
+  remove(id: string) {
+    delete this.cache[id];
   }
 };
 

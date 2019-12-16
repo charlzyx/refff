@@ -1,46 +1,14 @@
 {
-  "name": "relx-ops",
+  "name": "@refff/core",
   "version": "0.1.0",
   "private": true,
-  "homepage": "/ops",
-  "dependencies": {
-    "@reach/router": "^1.2.1",
-    "antd": "3.26.0",
-    "async-validator": "^3.1.0",
-    "axios": "^0.19.0",
+  "main": "./src/index.ts",
+  "types": "./src/types.d.ts",
+  "peerDependencies": {
     "immer": "5.0.0",
-    "lodash": "^4.17.15",
-    "md5": "^2.2.1",
-    "mitt": "^1.2.0",
-    "qs": "^6.9.0",
-    "react": "^16.9.0",
-    "react-dom": "^16.9.0",
-    "styled-components": "^4.4.0",
-    "use-immer": "^0.3.4"
+    "lodash": "^4.17.15"
   },
   "scripts": {
-    "faker": "node ./lib/pont-faker/bin/index.js -p 2333",
-    "start": "react-app-rewired start",
-    "build": "react-app-rewired build",
-    "test": "react-app-rewired test",
-    "eject": "react-scripts eject",
-    "storybook": "start-storybook -p 6006",
-    "build-storybook": "build-storybook",
-    "pont": "node ./node_modules/pont-engine/bin/init.js",
-    "pont-check": "pont check",
-    "pont-diff": "pont diff"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
   },
   "devDependencies": {
     "@babel/cli": "7.7.4",
@@ -49,45 +17,12 @@
     "@babel/preset-env": "7.7.4",
     "@commitlint/cli": "^8.2.0",
     "@commitlint/config-conventional": "^8.2.0",
-    "@storybook/addon-actions": "^5.2.4",
-    "@storybook/addon-docs": "^5.2.4",
-    "@storybook/addon-info": "^5.2.4",
-    "@storybook/addon-knobs": "^5.2.4",
-    "@storybook/addon-links": "^5.2.4",
-    "@storybook/addon-viewport": "^5.2.4",
-    "@storybook/addons": "^5.2.4",
-    "@storybook/react": "^5.2.4",
-    "@storybook/source-loader": "^5.2.4",
-    "@types/jest": "24.0.23",
     "@types/lodash": "^4.14.141",
-    "@types/md5": "^2.1.33",
-    "@types/moment": "^2.13.0",
-    "@types/node": "12.12.14",
-    "@types/qs": "^6.5.3",
     "@types/react": "16.9.15",
     "@types/react-dom": "16.9.4",
-    "@types/storybook__react": "^4.0.2",
-    "@types/styled-components": "^4.1.19",
-    "@types/webpack-env": "^1.14.0",
-    "@yued/pont-engine": "^0.2.16",
-    "babel-loader": "^8.0.6",
-    "babel-plugin-import": "1.13.0",
-    "babel-plugin-lodash": "^3.3.4",
-    "customize-cra": "0.9.1",
-    "eslint-config-prettier": "^6.0.0",
-    "eslint-plugin-prettier": "^3.1.0",
-    "http-proxy-middleware": "^0.20.0",
     "husky": "^3.0.7",
-    "less": "^3.10.3",
-    "less-loader": "^5.0.0",
     "lint-staged": "9.5.0",
-    "pont-engine": "0.3.5",
-    "power-assert": "^1.6.1",
-    "react-app-rewired": "^2.1.3",
-    "react-docgen-typescript-loader": "^3.3.0",
-    "react-scripts": "3.3.0",
     "typescript": "^3.7.3",
-    "utility-types": "^3.8.0"
   },
   "husky": {
     "hooks": {
@@ -100,8 +35,5 @@
       "eslint --fix",
       "git add"
     ]
-  },
-  "eslintIgnore": [
-    "src/api"
-  ]
+  }
 }

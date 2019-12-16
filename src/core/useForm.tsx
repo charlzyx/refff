@@ -169,8 +169,11 @@ export const useForm = <T extends object>(
       on.unmounted(onUnMounted)
     );
 
+    const id = uid.current;
+
     return () => {
       godie();
+      pool.remove(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
