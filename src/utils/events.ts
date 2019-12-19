@@ -3,7 +3,6 @@ import mitt from 'mitt';
 
 const getTypes = (id: string) => ({
   change: `${id}_change`,
-  disabled: `${id}_disabled`,
   reset: `${id}_reset`,
   clean: `${id}_clean`,
   validate: `${id}_validate`,
