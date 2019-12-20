@@ -86,7 +86,7 @@ export const useForm = <T extends object>(
       history.current = [];
       redos.current = [];
       data.current = reset ? reset : next;
-      emit.reset({ path });
+      emit.reset({ path, replaced: !!reset });
     },
     [emit],
   );

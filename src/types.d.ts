@@ -12,7 +12,7 @@ export declare module '@refff/core' {
     | 'timeout';
   export namespace Event {
     /** 外部调用 重置表单数据 */
-    type reset = (event: { path?: string }) => void;
+    type reset = (event: { path?: string; replaced: boolean }) => void;
     /** Filed -> useForm 主动校验 */
     type validate = (event: { vid: string; status: ValidateStatus }) => void;
     /** 外部调用 clean validate */
@@ -62,12 +62,12 @@ export declare module '@refff/core' {
       value?: string;
       onChange?: string;
       onBlur?: string;
-      editable?: string;
+      disabled?: string;
       valid?: string;
       help?: string;
     };
     field: {
-      editable?: string;
+      disabled?: string;
       valid?: string;
       help?: string;
     };
@@ -100,7 +100,7 @@ export declare module '@refff/core' {
 
   export type FormConfig = {
     trigger?: 'onBlur' | 'onChange';
-    editable?: boolean;
+    disabled?: boolean;
   };
 
   export type DeepReadonly<T> = {

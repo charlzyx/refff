@@ -189,10 +189,13 @@ export const Field: FC<TProps> = (props) => {
     [__path, data, setValue, value],
   );
   const onReset = useCallback<Event.reset>(
-    ({ path }) => {
+    ({ path, replaced }) => {
       const deps = getDepsByPath(__path);
       const should = !path || isDepsMatched(path, deps);
       if (should) {
+        if (replaced) {
+          touched.current = false;
+        }
         setValue(getValueByPath(data.current, __path));
         setValidStatus('init');
       }
