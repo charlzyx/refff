@@ -192,7 +192,7 @@ export const useForm = <T extends object>(
       }
       return Reflect.get(target.current, key);
     },
-  }) as DeepReadonly<T & { __ctx: typeof ctx }>;
+  }) as DeepReadonly<T & { __ctx: typeof ctx; current: typeof data.current }>;
 
   type OverChecking = {
     (path: string): Promise<Partial<T>>;

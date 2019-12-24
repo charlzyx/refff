@@ -174,8 +174,8 @@ export const Field: FC<TProps> = (props) => {
       }
       const deps = getDepsByPath(__path);
       if (Array.isArray(deps)) {
-        const isMatch = isDepsMatched(path, deps);
-        if (isMatch) {
+        const matched = isDepsMatched(path, deps);
+        if (matched) {
           touched.current = true;
           setValue(getValueByPath(data.current, __path));
         }
