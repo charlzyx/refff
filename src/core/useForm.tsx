@@ -75,9 +75,10 @@ export const useForm = <T extends object>(
         });
       });
       data.current = next as T;
+      if (effect) effect(data.current, 'change');
       return next;
     },
-    [emit],
+    [effect, emit],
   );
 
   const doReset = useCallback(
