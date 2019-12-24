@@ -133,7 +133,6 @@ export const useForm = <T extends object>(
     ({ vid, status }) => {
       validMap.current[vid] = status;
       const computedValid = isValid(validMap.current);
-      console.log(validMap.current, validRef.current, computedValid, valid);
       if (computedValid !== validRef.current) {
         setValid(computedValid);
       }
@@ -162,7 +161,9 @@ export const useForm = <T extends object>(
   useEffect(() => {
     on.debug((type, e) => {
       if (typeof effect === 'function') {
-        effect(data.current, type.replace(/[^change]/g, ''), e);
+        if (/change/.test(type)) {
+          effect(data.current, type.replace(/[^change]/g, ''), e);
+        }
       }
     });
     const godie = dying(
