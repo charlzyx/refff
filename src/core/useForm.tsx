@@ -83,11 +83,17 @@ export const useForm = <T extends object>(
 
   const doReset = useCallback(
     (reset?: T, path?: string) => {
-      const next = applyPatches(data.current, history.current.reverse());
-      history.current = [];
-      redos.current = [];
-      data.current = reset ? reset : next;
-      emit.reset({ path, replaced: !!reset });
+      if (path) {
+        // TODO: 按说是等子组件发出 onChange 回来就行, 但是 value 就很难说了
+        // 不行 就砍掉 path 功能
+        emit.reset({ path, replaced: !!reset });
+      } else {
+        const next = applyPatches(data.current, history.current.reverse());
+        history.current = [];
+        redos.current = [];
+        data.current = reset ? reset : next;
+        emit.reset({ path, replaced: !!reset });
+      }
     },
     [emit],
   );

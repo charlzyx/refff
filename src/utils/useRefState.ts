@@ -24,9 +24,9 @@ export const useRefState = <S>(
     return value;
   });
 
-  const setValue = useCallback<typeof setState>(next => {
+  const setValue = useCallback<typeof setState>((next) => {
     if (next instanceof Function) {
-      setState(prev => {
+      setState((prev) => {
         const nextValue = next(prev);
         ref.current = nextValue;
         return nextValue;
