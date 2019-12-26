@@ -179,14 +179,12 @@ export const Field: FC<TProps> = (props) => {
           touched.current = true;
           setValue(getValueByPath(data.current, __path));
         }
-      } else {
-        if (isMatch(__path, path) && next !== value) {
-          touched.current = true;
-          setValue(next);
-        }
+      } else if (isMatch(__path, path) && next !== valueRef.current) {
+        touched.current = true;
+        setValue(next);
       }
     },
-    [__path, data, setValue, value],
+    [__path, data, setValue, valueRef],
   );
   const onReset = useCallback<Event.reset>(
     ({ path, replaced }) => {
