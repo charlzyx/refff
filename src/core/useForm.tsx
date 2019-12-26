@@ -169,7 +169,10 @@ export const useForm = <T extends object>(
     on.debug((type, e) => {
       if (typeof effect === 'function') {
         if (/change/.test(type)) {
-          effect(data.current, type.replace(/[^change]/g, ''), e);
+          effect(data.current, 'change', e);
+        }
+        if (/reset/.test(type)) {
+          effect(data.current, 'reset', e);
         }
       }
     });
