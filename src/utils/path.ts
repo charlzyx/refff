@@ -23,13 +23,19 @@ export const isMatch = (shorter: Path | Path[], longer: Path | Path[]) => {
   return true;
 };
 
-export const getValueByPath = (data: any, path: Path | [Path, Path][]) => {
+type PathMapper = [Path, Path];
+export const getValueByPath = (data: any, path: Path | PathMapper[]) => {
   if (!Array.isArray(path)) {
     return _.get(data, path);
   }
-  const isArray = typeof path[0][0] === 'number';
+
+  const isArrayValue =
+    Array.isArray(path) && Array.isArray(path[0])
+      ? typeof path[0][0] === 'number'
+      : false;
   // 创建初始对象
-  const value: any = isArray ? [] : {};
+  const value: any = isArrayValue ? [] : {};
+  console.log('???path', path);
   path.forEach((pair) => {
     const [p1, p2] = pair;
     value[p1] = _.get(data, p2);

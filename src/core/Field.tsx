@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import {
   Event,
   FieldProps,
@@ -46,6 +47,7 @@ type TProps = {
   trigger?: 'onBlur' | 'onChange';
   children:
     | ReactElement
+    | null
     | ((props: {
         value: any;
         onChange: (x: any) => any;
@@ -53,7 +55,7 @@ type TProps = {
         disabled: boolean;
         valid: ValidateStatus;
         help: string;
-      }) => ReactElement);
+      }) => ReactElement | null);
   disabled?: boolean;
   rules?: Rule | Rule[];
   pipe?: TPipeConfig;
@@ -61,6 +63,9 @@ type TProps = {
   label?: string;
   path: any;
   value?: never;
+  box?: boolean;
+  effect?: (value: any) => void;
+  // list?: boolean;
 } & Omit<FieldProps, 'children'>;
 
 export const Field: FC<TProps> = (props) => {
@@ -72,6 +77,9 @@ export const Field: FC<TProps> = (props) => {
     disabled,
     pipe,
     meta,
+    box,
+    effect,
+    // list,
     ...others
   } = props;
   const uid = useRef(_.uniqueId('fff_filed'));
@@ -88,6 +96,16 @@ export const Field: FC<TProps> = (props) => {
   const finaldisabled = disabled === undefined ? config.disabled : disabled;
 
   const checkerRef = useRef<Event.validator>(notReady);
+  const helphelp = useCallback(
+    (msg: string | undefined | void | null) => {
+      if (!msg) return '';
+      return msg
+        .replace(/%label/g, others.label || '')
+        .replace(/%path/g, __path.toString() || '')
+        .replace(/%value/, valueRef.current);
+    },
+    [__path, others.label, valueRef],
+  );
 
   // 触发方法们
   const doChange = useCallback(
@@ -134,14 +152,14 @@ export const Field: FC<TProps> = (props) => {
           }
           const msg = results.find((x) => x);
           setValidStatus('success');
-          setHelp(msg || '');
+          setHelp(helphelp(msg));
         })
         .catch((error) => {
           if (count < race.current) {
             return 'timeout';
           }
           setValidStatus('error');
-          setHelp(error?.message);
+          setHelp(helphelp(error?.message));
           throw error;
         });
     }
@@ -153,17 +171,17 @@ export const Field: FC<TProps> = (props) => {
           return 'timeout';
         }
         setValidStatus('success');
-        setHelp(msg || '');
+        setHelp(helphelp(msg));
       })
       .catch((error) => {
         if (count < race.current) {
           return 'timeout';
         }
         setValidStatus('error');
-        setHelp(error?.message);
+        setHelp(helphelp(error?.message));
         throw error;
       });
-  }, [others.label, rules, valueRef]);
+  }, [helphelp, others.label, rules, valueRef]);
 
   // 监听者们
   const onChange = useCallback<Event.change>(
@@ -246,7 +264,16 @@ export const Field: FC<TProps> = (props) => {
   }, []);
 
   useEffect(() => {
-    if (!touched.current) return;
+    if (typeof effect === 'function') {
+      effect(valueRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effect, value]);
+
+  useEffect(() => {
+    if (!touched.current) {
+      return;
+    }
     if (finalTrigger === 'onChange') {
       doValidate();
     }
@@ -283,6 +310,7 @@ export const Field: FC<TProps> = (props) => {
 
   const emitChange = useCallback(
     (next) => {
+      console.log('ooooioemitChange', next);
       doChange(next);
       return next;
     },
@@ -319,6 +347,37 @@ export const Field: FC<TProps> = (props) => {
   );
   const pipes = merge.pipe(settings.get().pipe, statics.pipe, pipe);
   const byPipes = pipes.c2v.concat(emitChange);
+  // 这个坑有点大, 后面填
+  // if (list) {
+  //   const slotdata = (children as ReactElement).props.data;
+  //   const actions = {
+  //     append() {
+  //       setValue((v: any) => {
+  //         return [...v, { ...slotdata }];
+  //       });
+  //     },
+  //     remove(index: number) {
+  //       setValue((v: any) => {
+  //         return v.filter((x: any, idx: number) => idx !== index);
+  //       });
+  //     },
+  //     insert(form: number, to: number) {
+  //       const val = [...valueRef.current];
+  //       const start = Math.min(form, to);
+  //       let end = Math.max(form, to);
+  //       const moved = val[end];
+  //       while (end >= start) {
+  //         if (end === start) {
+  //           val[start] = moved;
+  //         } else {
+  //           val[end] = val[end - 1];
+  //         }
+  //         end--;
+  //       }
+  //       setValue(val);
+  //     },
+  //   };
+  // }
   const waitOverrides = {
     value: flush(value, childProps, pipes.v2c),
     onChange: (x: any) => flush(x, childProps, byPipes),
@@ -331,6 +390,7 @@ export const Field: FC<TProps> = (props) => {
   const overrides = {
     ...childProps,
     ...remapping(waitOverrides, childMapping),
+    __path,
   };
 
   const filedProps = {
@@ -339,7 +399,11 @@ export const Field: FC<TProps> = (props) => {
   };
 
   if (typeof children === 'function') {
-    return <UI.Field {...filedProps}>{children(overrides)}</UI.Field>;
+    return box === true ? (
+      <UI.Field {...filedProps}>{children(overrides)}</UI.Field>
+    ) : (
+      children(overrides)
+    );
   }
   const clone = cloneElement(children as ReactElement, overrides);
   return <UI.Field {...filedProps}>{clone}</UI.Field>;

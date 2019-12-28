@@ -12,6 +12,7 @@ export const useForm = <T extends object>(
   effect?: (data: T, type: Effects, e?: any) => void,
 ) => {
   const uid = useRef(_.uniqueId('fff_form'));
+  // const copy = useRef(_.cloneDeep(init));
   const data = useRef<T>(init);
   const [valid, setValid, validRef] = useRefState(false);
   const validMap = useRef<ValidMap>({});
@@ -83,9 +84,8 @@ export const useForm = <T extends object>(
 
   const doReset = useCallback(
     (reset?: T, path?: string) => {
+      // 只有内部调用才有 path
       if (path) {
-        // TODO: 按说是等子组件发出 onChange 回来就行, 但是 value 就很难说了
-        // 不行 就砍掉 path 功能
         emit.reset({ path, replaced: !!reset });
       } else {
         const next = applyPatches(data.current, history.current.reverse());
@@ -96,6 +96,13 @@ export const useForm = <T extends object>(
       }
     },
     [emit],
+  );
+
+  const outReset = useCallback(
+    (reset?: T) => {
+      doReset(reset);
+    },
+    [doReset],
   );
 
   const doClean = useCallback(
@@ -125,7 +132,13 @@ export const useForm = <T extends object>(
   const onMounted = useCallback<Event.mounted>(({ vid, path, checker }) => {
     pathMap.current[vid] = path;
     validMap.current[vid] = 'init';
-    checkerQueue.current.push({ vid, runner: checker });
+
+    const found = checkerQueue.current.findIndex((c) => c.vid === vid);
+    if (found > -1) {
+      checkerQueue.current[found] = { vid, runner: checker };
+    } else {
+      checkerQueue.current.push({ vid, runner: checker });
+    }
   }, []);
   const onUnMounted = useCallback<Event.unmounted>(({ vid }) => {
     delete pathMap.current[vid];
@@ -211,14 +224,14 @@ export const useForm = <T extends object>(
   };
   const ans: {
     data: typeof proxy;
-    reset: typeof doReset;
+    reset: typeof outReset;
     put: typeof doPut;
     clean: typeof doClean;
     checking: OverChecking;
     valid: typeof valid;
   } = {
     data: proxy,
-    reset: doReset,
+    reset: outReset,
     put: doPut,
     clean: doClean,
     valid,
