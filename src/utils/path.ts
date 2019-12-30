@@ -35,7 +35,6 @@ export const getValueByPath = (data: any, path: Path | PathMapper[]) => {
       : false;
   // 创建初始对象
   const value: any = isArrayValue ? [] : {};
-  console.log('???path', path);
   path.forEach((pair) => {
     const [p1, p2] = pair;
     value[p1] = _.get(data, p2);

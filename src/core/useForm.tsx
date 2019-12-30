@@ -12,57 +12,44 @@ export const useForm = <T extends object>(
   effect?: (data: T, type: Effects, e?: any) => void,
 ) => {
   const uid = useRef(_.uniqueId('fff_form'));
-  // const copy = useRef(_.cloneDeep(init));
+  // 初始值
   const data = useRef<T>(init);
+  // 实时校验结果
   const [valid, setValid, validRef] = useRefState(false);
+  // vid: validStatus
   const validMap = useRef<ValidMap>({});
+  // vid: path
   const pathMap = useRef<PathMap>({});
+  // vid, runner[]
   const checkerQueue = useRef<{ vid: string; runner: Event.validator }[]>([]);
-
+  // form context
   const ctx = useRef<TCtx>({
     config: {},
     data,
     fid: uid.current,
   });
-
+  // history
   const history = useRef<Patch[]>([]);
+  // redos
   const redos = useRef<Patch[]>([]);
-
+  // events manager
   const { emit, on } = pool.get(uid.current);
 
   /**
-   * WIP: 时光旅行
+   * WIP: 时光旅行, 太难了, 写不出来
    */
-  const undo = useCallback(() => {
-    const patch = history.current.pop();
-    if (patch) {
-      redos.current.push(patch);
-      const next = applyPatches(data.current, [patch]);
-      data.current = next;
-      emit.change({
-        next: patch.value,
-        path: patch.path,
-        source: uid.current,
-      });
-    }
-  }, [emit]);
+  const undo = useCallback(() => {}, []);
+  const redo = useCallback(() => {}, []);
 
-  const redo = useCallback(() => {
-    const patch = redos.current.pop();
-    redos.current.pop();
-    if (patch) {
-      history.current.push(patch);
-      const next = applyPatches(data.current, [patch]);
-      data.current = next;
-      emit.change({
-        next: patch.value,
-        path: patch.path,
-        source: uid.current,
-      });
-    }
-  }, [emit]);
-
-  // 外部触发的方法们
+  // 加载完成, 广播最新值
+  const doInit = useCallback(
+    (next: T) => {
+      console.log('out init');
+      emit.init({ next });
+    },
+    [emit],
+  );
+  // 外部修改字段值
   const doPut = useCallback(
     (recipe: (copy: T) => void | T) => {
       const next = produce(data.current, recipe, (patches, inversPatches) => {
@@ -76,42 +63,45 @@ export const useForm = <T extends object>(
         });
       });
       data.current = next as T;
-      if (effect) effect(data.current, 'change');
+      // if (effect) effect(data.current, 'change');
       return next;
     },
-    [effect, emit],
+    [emit],
   );
-
+  // 重置表单值
   const doReset = useCallback(
-    (reset?: T, path?: string) => {
+    (reset?: T, withValid?: boolean, path?: string) => {
       // 只有内部调用才有 path
       if (path) {
-        emit.reset({ path, replaced: !!reset });
+        emit.reset({ path, replaced: !!reset, withValid });
       } else {
         const next = applyPatches(data.current, history.current.reverse());
         history.current = [];
         redos.current = [];
         data.current = reset ? reset : next;
-        emit.reset({ path, replaced: !!reset });
+        // doInit(data.current);
+        setTimeout(() => {
+          emit.reset({ path, replaced: !!reset, withValid });
+        });
       }
     },
     [emit],
   );
 
   const outReset = useCallback(
-    (reset?: T) => {
-      doReset(reset);
+    (reset?: T, withValid?: boolean) => {
+      doReset(reset, withValid);
     },
     [doReset],
   );
-
+  // 清理校验状态
   const doClean = useCallback(
     (path?: string) => {
       emit.clean({ path });
     },
     [emit],
   );
-
+  // 进行异步校验
   const doChecking = useCallback((path?: string) => {
     if (path) {
       const checker = checkerQueue.current.find((c) =>
@@ -122,33 +112,55 @@ export const useForm = <T extends object>(
       }
       return Promise.resolve(_.get(data.current, path));
     }
-    return Promise.all(checkerQueue.current.map((c) => c.runner())).then<T>(
+    console.log(checkerQueue.current, pathMap);
+    return Promise.all(checkerQueue.current.map((c) => c.runner())).then(
       () => data.current,
     );
   }, []);
 
   // 监听者们
-
-  const onMounted = useCallback<Event.mounted>(({ vid, path, checker }) => {
-    pathMap.current[vid] = path;
-    validMap.current[vid] = 'init';
-
-    const found = checkerQueue.current.findIndex((c) => c.vid === vid);
-    if (found > -1) {
-      checkerQueue.current[found] = { vid, runner: checker };
-    } else {
-      checkerQueue.current.push({ vid, runner: checker });
-    }
-  }, []);
-  const onUnMounted = useCallback<Event.unmounted>(({ vid }) => {
-    delete pathMap.current[vid];
-    delete validMap.current[vid];
-    checkerQueue.current.forEach((c, index) => {
-      if (c.vid === vid) {
-        checkerQueue.current.splice(index, 1);
+  // 挂载 Field
+  const onMounted = useCallback<Event.mounted>(
+    ({ vid, path, checker, validStatus }) => {
+      pathMap.current[vid] = path;
+      validMap.current[vid] = validStatus;
+      // 更新 valid
+      const computedValid = isValid(validMap.current);
+      if (computedValid !== validRef.current) {
+        setValid(computedValid);
       }
-    });
-  }, []);
+      const found = checkerQueue.current.findIndex((c) => c.vid === vid);
+      if (found > -1) {
+        checkerQueue.current[found] = { vid, runner: checker };
+      } else {
+        checkerQueue.current.push({ vid, runner: checker });
+      }
+      console.log('onmount', checkerQueue.current);
+    },
+    [setValid, validRef],
+  );
+  // 卸载 Field
+  const onUnMounted = useCallback<Event.unmounted>(
+    ({ vid }) => {
+      console.log('unmount', vid, pathMap.current[vid]);
+      delete pathMap.current[vid];
+      delete validMap.current[vid];
+      // 更新 valid
+      const computedValid = isValid(validMap.current);
+      if (computedValid !== validRef.current) {
+        setValid(computedValid);
+      }
+      checkerQueue.current = checkerQueue.current.filter((x) => x.vid === vid);
+      console.log('unmount', checkerQueue.current);
+      // checkerQueue.current.forEach((c, index) => {
+      //   if (c.vid === vid) {
+      //     checkerQueue.current.splice(index, 1);
+      //   }
+      // });
+    },
+    [setValid, validRef],
+  );
+  // 校验 Field
   const onValidate = useCallback<Event.validate>(
     ({ vid, status }) => {
       validMap.current[vid] = status;
@@ -157,10 +169,9 @@ export const useForm = <T extends object>(
         setValid(computedValid);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [setValid, validRef],
   );
-
+  // 值变化 Field
   const onChange = useCallback<Event.change>(({ next, path, source }) => {
     if (source === uid.current) {
       return;
@@ -179,7 +190,7 @@ export const useForm = <T extends object>(
 
   // 事件的注册与销毁
   useEffect(() => {
-    on.debug((type, e) => {
+    on.all((type, e) => {
       if (typeof effect === 'function') {
         if (/change/.test(type)) {
           effect(data.current, 'change', e);
@@ -196,6 +207,9 @@ export const useForm = <T extends object>(
       on.mounted(onMounted),
       on.unmounted(onUnMounted),
     );
+    setTimeout(() => {
+      doInit(data.current);
+    });
 
     const id = uid.current;
 

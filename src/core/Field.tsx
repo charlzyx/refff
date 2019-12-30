@@ -38,10 +38,7 @@ import { useRefState } from '../utils/useRefState';
 const { UI } = settings.get();
 
 const notReady = () => Promise.resolve();
-
-// type OneOf<T, U> =
-//   | ({ [P in keyof T]?: never } & U)
-//   | ({ [P in keyof U]?: never } & T);
+const noop = (...args: any): any => {};
 
 type TProps = {
   trigger?: 'onBlur' | 'onChange';
@@ -71,7 +68,7 @@ type TProps = {
 export const Field: FC<TProps> = (props) => {
   const {
     children,
-    path: __path = '',
+    path: __path,
     trigger,
     rules,
     disabled,
@@ -83,19 +80,28 @@ export const Field: FC<TProps> = (props) => {
     ...others
   } = props;
   const uid = useRef(_.uniqueId('fff_filed'));
+  // Form context
   const { fid, data, config } = useContext(Ctx);
+  // events
   const { emit, on } = pool.get(fid);
+  const prePath = useRef('');
+  const [initialized, setInitialized] = useState(false);
+  // 方法的引用们
+  const onRefs = useRef({
+    change: noop,
+    reset: noop,
+    clean: noop,
+    init: noop,
+  });
+  // touched flag
   const touched = useRef(false);
+  // value
   const [value, setValue, valueRef] = useRefState(
     getValueByPath(data.current, __path),
   );
+  // 校验信息
   const [help, setHelp] = useState('');
-  const [valid, setValidStatus] = useState<ValidateStatus>('init');
-  const race = useRef(0);
-  const finalTrigger = trigger || config.trigger;
-  const finaldisabled = disabled === undefined ? config.disabled : disabled;
-
-  const checkerRef = useRef<Event.validator>(notReady);
+  // 校验信息辅助函数
   const helphelp = useCallback(
     (msg: string | undefined | void | null) => {
       if (!msg) return '';
@@ -107,11 +113,22 @@ export const Field: FC<TProps> = (props) => {
     [__path, others.label, valueRef],
   );
 
+  // 校验状态
+  const [valid, setValidStatus] = useState<ValidateStatus>('init');
+  // 校验竞态标记
+  const race = useRef(0);
+  // 触发 校验设置
+  const finalTrigger = trigger || config.trigger;
+  // 是否 disabled
+  const finaldisabled = disabled === undefined ? config.disabled : disabled;
+  // 校验函数
+  const checkerRef = useRef<Event.validator>(notReady);
+
   // 触发方法们
   const doChange = useCallback(
     (next: typeof value) => {
       setValue(next);
-      // const deps = getDepsByPath(__path);
+      // 结构形式会有多个 path
       if (Array.isArray(__path)) {
         __path.forEach((pair) => {
           emit.change({
@@ -131,6 +148,7 @@ export const Field: FC<TProps> = (props) => {
     [__path, emit, setValue, value],
   );
 
+  // 校验方法
   const doValidate = useCallback<Event.validator>(() => {
     setValidStatus('validating');
     const count = ++race.current;
@@ -184,6 +202,7 @@ export const Field: FC<TProps> = (props) => {
   }, [helphelp, others.label, rules, valueRef]);
 
   // 监听者们
+  // 监听外部变更
   const onChange = useCallback<Event.change>(
     ({ next, path, source }) => {
       if (source === uid.current) {
@@ -191,78 +210,100 @@ export const Field: FC<TProps> = (props) => {
         return;
       }
       const deps = getDepsByPath(__path);
+
+      const neo = getValueByPath(data.current, __path);
       if (Array.isArray(deps)) {
         const matched = isDepsMatched(path, deps);
         if (matched) {
           touched.current = true;
-          setValue(getValueByPath(data.current, __path));
+          setValue(neo);
         }
-      } else if (isMatch(__path, path) && next !== valueRef.current) {
+      } else if (isMatch(__path, path) && neo !== valueRef.current) {
         touched.current = true;
-        setValue(next);
+        setValue(neo);
       }
     },
     [__path, data, setValue, valueRef],
   );
-  const onReset = useCallback<Event.reset>(
-    ({ path, replaced }) => {
-      const deps = getDepsByPath(__path);
-      const should = !path || isDepsMatched(path, deps);
-      if (should) {
-        if (replaced) {
-          touched.current = false;
-        }
-        setValue(getValueByPath(data.current, __path));
-        setValidStatus('init');
-      }
-    },
-    [__path, data, setValue],
-  );
+
+  // 清理校验
   const onClean = useCallback<Event.clean>(
     ({ path }) => {
       const deps = getDepsByPath(__path);
       const should = !path || isDepsMatched(path, deps);
-      if (should) {
+      if (should && rules) {
         setValidStatus('init');
       }
     },
-    [__path],
+    [__path, rules],
   );
 
-  // 事件的注册与销毁
-  useEffect(() => {
-    const deps = getDepsByPath(__path);
-    // 等待 useForm 挂载完监听 onValid时间
-    setTimeout(() => {
-      if (finaldisabled) {
-        return;
+  // reset 方法
+  const onReset = useCallback<Event.reset>(
+    ({ path, replaced, withValid }) => {
+      if (__path === undefined) return;
+      console.log('onreset', __path);
+      const deps = getDepsByPath(__path);
+      const should = !path || isDepsMatched(path, deps);
+      if (should) {
+        // 更新最新值
+        setValue(getValueByPath(data.current, __path));
+        // 触发挂载事件
+        const validStatus = rules ? (withValid ? 'init' : valid) : 'success';
+
+        console.log('__path', __path);
+
+        emit.mounted({
+          vid: uid.current,
+          path: __path,
+          checker: () => {
+            console.log('run checker', __path);
+            return checkerRef.current();
+          },
+          validStatus,
+        });
+        setValidStatus(validStatus);
+        if (withValid) {
+          doValidate();
+          // checkerRef.current();
+        }
       }
-      emit.validate({ vid: uid.current, status: valid });
+    },
+    [__path, data, doValidate, emit, rules, setValue, valid],
+  );
+
+  // init 之后再触发各种事情(valid, mounted.....)
+  const onInit = useCallback<Event.init & { withValid?: boolean }>(
+    ({ next }) => {
+      console.log('oninit', __path);
+      if (__path === undefined) return;
+      // 更新最新值
+      setValue(getValueByPath(next, __path));
+      // 触发挂载事件
+      const validStatus = rules ? valid : 'success';
+      setValidStatus(validStatus);
+      setInitialized(true);
       emit.mounted({
         vid: uid.current,
-        // 注意!! 这里会影响 dochecking, 比如要校验时间段, 就只能用
-        // checking('start') 来校验这个动态字段
-        path: Array.isArray(deps) ? deps[0] : (deps as string),
+        path: __path,
         checker: () => {
+          console.log('run checking', __path);
           return checkerRef.current();
         },
+        validStatus,
       });
-    });
+    },
+    [__path, emit, rules, setValue, valid],
+  );
 
-    const godie = dying(
-      uid.current,
-      on.change(onChange),
-      on.reset(onReset),
-      on.clean(onClean),
-    );
-    const vid = uid.current;
-    return () => {
-      godie();
-      emit.unmounted({ vid });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => {
+    onRefs.current.change = onChange;
+    onRefs.current.reset = onReset;
+    onRefs.current.clean = onClean;
+    onRefs.current.init = onInit;
+  }, [onChange, onClean, onInit, onReset]);
 
+  // 触发 Field effect
   useEffect(() => {
     if (typeof effect === 'function') {
       effect(valueRef.current);
@@ -270,6 +311,7 @@ export const Field: FC<TProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effect, value]);
 
+  // 触发 validate
   useEffect(() => {
     if (!touched.current) {
       return;
@@ -280,37 +322,61 @@ export const Field: FC<TProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, finalTrigger]);
 
+  // 更新 useForm 中使用的 run check
   useEffect(() => {
     checkerRef.current = doValidate;
   }, [doValidate]);
 
   useEffect(() => {
-    const deps = getDepsByPath(__path);
     if (finaldisabled) {
       emit.unmounted({ vid: uid.current });
     } else {
-      emit.mounted({
-        vid: uid.current,
-        // 注意!! 这里会影响 dochecking, 比如要校验时间段, 就只能用
-        // checking('start') 来校验这个动态字段
-        path: Array.isArray(deps) ? deps[0] : (deps as string),
-        checker: () => {
-          return checkerRef.current();
-        },
-      });
+      // 模拟一次 init
+      console.log('disabled init');
+      emit.init({ next: data.current });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emit, finaldisabled]);
+  }, [finaldisabled]);
 
+  useEffect(() => {
+    if (!_.isEqual(prePath.current, __path) && initialized) {
+      prePath.current = __path;
+      console.log('__path change', __path);
+      // emit.unmounted({ vid: uid.current });
+      emit.init({ next: data.current });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [__path, initialized]);
+
+  // 校验状态变更, 通知 useForm
   useEffect(() => {
     if (valid !== 'timeout') {
       emit.validate({ vid: uid.current, status: valid });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emit, valid]);
+
+  useEffect(() => {
+    // mounted
+    const vid = uid.current;
+
+    const godie = dying(
+      uid.current,
+      on.init((...args) => onRefs.current.init(...args)),
+      on.change((...args) => onRefs.current.change(...args)),
+      on.reset((...args) => onRefs.current.reset(...args)),
+      on.clean((...args) => onRefs.current.clean(...args)),
+    );
+    // unmounted
+    return () => {
+      godie();
+      emit.unmounted({ vid });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const emitChange = useCallback(
     (next) => {
-      console.log('ooooioemitChange', next);
       doChange(next);
       return next;
     },
@@ -347,39 +413,9 @@ export const Field: FC<TProps> = (props) => {
   );
   const pipes = merge.pipe(settings.get().pipe, statics.pipe, pipe);
   const byPipes = pipes.c2v.concat(emitChange);
-  // 这个坑有点大, 后面填
-  // if (list) {
-  //   const slotdata = (children as ReactElement).props.data;
-  //   const actions = {
-  //     append() {
-  //       setValue((v: any) => {
-  //         return [...v, { ...slotdata }];
-  //       });
-  //     },
-  //     remove(index: number) {
-  //       setValue((v: any) => {
-  //         return v.filter((x: any, idx: number) => idx !== index);
-  //       });
-  //     },
-  //     insert(form: number, to: number) {
-  //       const val = [...valueRef.current];
-  //       const start = Math.min(form, to);
-  //       let end = Math.max(form, to);
-  //       const moved = val[end];
-  //       while (end >= start) {
-  //         if (end === start) {
-  //           val[start] = moved;
-  //         } else {
-  //           val[end] = val[end - 1];
-  //         }
-  //         end--;
-  //       }
-  //       setValue(val);
-  //     },
-  //   };
-  // }
+
   const waitOverrides = {
-    value: flush(value, childProps, pipes.v2c),
+    value: flush(valueRef.current, childProps, pipes.v2c),
     onChange: (x: any) => flush(x, childProps, byPipes),
     onBlur: emitBlur,
     disabled: finaldisabled,

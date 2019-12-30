@@ -1,22 +1,66 @@
 import { Events } from '@refff/core';
-import mitt from 'mitt';
 
 const getTypes = (id: string) => ({
   change: `${id}_change`,
   reset: `${id}_reset`,
   clean: `${id}_clean`,
   validate: `${id}_validate`,
+  init: `${id}_init`,
   mounted: `${id}_mounted`,
   unmounted: `${id}_unmounted`,
 });
 
-const emitter: mitt.Emitter = mitt();
+const emitter: {
+  watchers: {
+    [x: string]: Function[];
+  };
+  on: (type: string, fn: Function) => void;
+  off: (type: string, fn: Function) => void;
+  emit: (type: string, e: any) => void;
+} = {
+  watchers: {},
+  on(type: string, fn: Function) {
+    this.watchers[type] = this.watchers[type] || [];
+    const found = this.watchers[type].findIndex((x: any) => x === fn);
+    if (found === -1) {
+      this.watchers[type].push(fn);
+    }
+  },
+  off(type: string, fn: Function) {
+    if (!Array.isArray(this.watchers[type])) return;
+    // const found = this.watchers[type].findIndex((x: any) => x === fn);
+    let i = 0;
+    while (i < this.watchers[type].length) {
+      if (this.watchers[type][i] === fn) {
+        this.watchers[type].splice(i, 1);
+      }
+      i++;
+    }
+    // if (found > -1) {
+    //   this.watchers[type].splice(found, 1);
+    // }
+  },
+  emit(type: string, e: any) {
+    if (!Array.isArray(this.watchers[type])) return;
+    let i = 0;
+    while (i < this.watchers[type].length) {
+      this.watchers[type][i](e);
+      i++;
+    }
+    if (!Array.isArray(this.watchers['*'])) return;
+    let idx = 0;
+    while (idx < this.watchers['*'].length) {
+      this.watchers['*'][idx](e);
+      idx++;
+    }
+  },
+};
 
 const events = (id: string): Events => {
   const types = getTypes(id);
   return {
     on: {
-      debug(fn) {
+      all(fn) {
         emitter.on('*', fn);
       },
       change(fn) {
@@ -27,6 +71,7 @@ const events = (id: string): Events => {
       },
       reset(fn) {
         emitter.on(types.reset, fn);
+        console.log('onssssss', fn, emitter.watchers);
         return () => {
           emitter.off(types.reset, fn);
         };
@@ -35,6 +80,12 @@ const events = (id: string): Events => {
         emitter.on(types.clean, fn);
         return () => {
           emitter.off(types.clean, fn);
+        };
+      },
+      init(fn) {
+        emitter.on(types.init, fn);
+        return () => {
+          emitter.off(types.init, fn);
         };
       },
       mounted(fn) {
@@ -61,10 +112,14 @@ const events = (id: string): Events => {
         emitter.emit(types.change, e);
       },
       reset(e) {
+        console.log('emitreset', e);
         emitter.emit(types.reset, e);
       },
       clean(e) {
         emitter.emit(types.clean, e);
+      },
+      init(e) {
+        emitter.emit(types.init, e);
       },
       mounted(e) {
         emitter.emit(types.mounted, e);
