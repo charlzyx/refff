@@ -277,7 +277,7 @@ export const Field: FC<TProps> = (props) => {
       // 更新最新值
       setValue(getValueByPath(next, __path));
       // 触发挂载事件
-      const validStatus = rules ? valid : 'success';
+      const validStatus = rules ? 'init' : 'success';
       setValidStatus(validStatus);
       setInitialized(true);
       emit.mounted({
@@ -289,7 +289,7 @@ export const Field: FC<TProps> = (props) => {
         validStatus,
       });
     },
-    [__path, emit, rules, setValue, valid],
+    [__path, emit, rules, setValue],
   );
 
   useEffect(() => {
