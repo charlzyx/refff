@@ -38,8 +38,8 @@ export const useForm = <T extends object>(
   /**
    * WIP: 时光旅行, 太难了, 写不出来
    */
-  const undo = useCallback(() => {}, []);
-  const redo = useCallback(() => {}, []);
+  // const undo = useCallback(() => {}, []);
+  // const redo = useCallback(() => {}, []);
 
   // 加载完成, 广播最新值
   const doInit = useCallback(
