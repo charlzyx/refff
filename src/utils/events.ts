@@ -28,7 +28,6 @@ const emitter: {
   },
   off(type: string, fn: Function) {
     if (!Array.isArray(this.watchers[type])) return;
-    // const found = this.watchers[type].findIndex((x: any) => x === fn);
     let i = 0;
     while (i < this.watchers[type].length) {
       if (this.watchers[type][i] === fn) {
@@ -36,9 +35,6 @@ const emitter: {
       }
       i++;
     }
-    // if (found > -1) {
-    //   this.watchers[type].splice(found, 1);
-    // }
   },
   emit(type: string, e: any) {
     if (!Array.isArray(this.watchers[type])) return;
@@ -71,7 +67,6 @@ const events = (id: string): Events => {
       },
       reset(fn) {
         emitter.on(types.reset, fn);
-        console.log('onssssss', fn, emitter.watchers);
         return () => {
           emitter.off(types.reset, fn);
         };
@@ -112,7 +107,6 @@ const events = (id: string): Events => {
         emitter.emit(types.change, e);
       },
       reset(e) {
-        console.log('emitreset', e);
         emitter.emit(types.reset, e);
       },
       clean(e) {

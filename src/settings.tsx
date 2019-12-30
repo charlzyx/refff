@@ -81,7 +81,6 @@ const set = {
   },
   validator: (v: Config['validator']) => {
     config.validator = v;
-    console.log('afterconfig', config);
   },
   pipe: (p: Config['pipe']) => (config.pipe = p),
   meta: (m: Config['meta']) => (config.meta = m),

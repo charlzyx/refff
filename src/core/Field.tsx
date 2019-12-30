@@ -28,6 +28,7 @@ import {
   pool,
   promisify,
   remapping,
+  useDebounce,
 } from '../utils';
 
 import { Ctx } from './ctx';
@@ -99,6 +100,7 @@ export const Field: FC<TProps> = (props) => {
   const [value, setValue, valueRef] = useRefState(
     getValueByPath(data.current, __path),
   );
+  const debounceValue = useDebounce(value);
   // 校验信息
   const [help, setHelp] = useState('');
   // 校验信息辅助函数
@@ -242,7 +244,6 @@ export const Field: FC<TProps> = (props) => {
   const onReset = useCallback<Event.reset>(
     ({ path, replaced, withValid }) => {
       if (__path === undefined) return;
-      console.log('onreset', __path);
       const deps = getDepsByPath(__path);
       const should = !path || isDepsMatched(path, deps);
       if (should) {
@@ -251,13 +252,10 @@ export const Field: FC<TProps> = (props) => {
         // 触发挂载事件
         const validStatus = rules ? (withValid ? 'init' : valid) : 'success';
 
-        console.log('__path', __path);
-
         emit.mounted({
           vid: uid.current,
           path: __path,
           checker: () => {
-            console.log('run checker', __path);
             return checkerRef.current();
           },
           validStatus,
@@ -275,7 +273,6 @@ export const Field: FC<TProps> = (props) => {
   // init 之后再触发各种事情(valid, mounted.....)
   const onInit = useCallback<Event.init & { withValid?: boolean }>(
     ({ next }) => {
-      console.log('oninit', __path);
       if (__path === undefined) return;
       // 更新最新值
       setValue(getValueByPath(next, __path));
@@ -287,7 +284,6 @@ export const Field: FC<TProps> = (props) => {
         vid: uid.current,
         path: __path,
         checker: () => {
-          console.log('run checking', __path);
           return checkerRef.current();
         },
         validStatus,
@@ -320,7 +316,7 @@ export const Field: FC<TProps> = (props) => {
       doValidate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, finalTrigger]);
+  }, [debounceValue, finalTrigger]);
 
   // 更新 useForm 中使用的 run check
   useEffect(() => {
@@ -332,7 +328,6 @@ export const Field: FC<TProps> = (props) => {
       emit.unmounted({ vid: uid.current });
     } else {
       // 模拟一次 init
-      console.log('disabled init');
       emit.init({ next: data.current });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -341,7 +336,6 @@ export const Field: FC<TProps> = (props) => {
   useEffect(() => {
     if (!_.isEqual(prePath.current, __path) && initialized) {
       prePath.current = __path;
-      console.log('__path change', __path);
       // emit.unmounted({ vid: uid.current });
       emit.init({ next: data.current });
     }

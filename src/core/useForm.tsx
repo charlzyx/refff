@@ -44,7 +44,6 @@ export const useForm = <T extends object>(
   // 加载完成, 广播最新值
   const doInit = useCallback(
     (next: T) => {
-      console.log('out init');
       emit.init({ next });
     },
     [emit],
@@ -112,7 +111,6 @@ export const useForm = <T extends object>(
       }
       return Promise.resolve(_.get(data.current, path));
     }
-    console.log(checkerQueue.current, pathMap);
     return Promise.all(checkerQueue.current.map((c) => c.runner())).then(
       () => data.current,
     );
@@ -135,14 +133,12 @@ export const useForm = <T extends object>(
       } else {
         checkerQueue.current.push({ vid, runner: checker });
       }
-      console.log('onmount', checkerQueue.current);
     },
     [setValid, validRef],
   );
   // 卸载 Field
   const onUnMounted = useCallback<Event.unmounted>(
     ({ vid }) => {
-      console.log('unmount', vid, pathMap.current[vid]);
       delete pathMap.current[vid];
       delete validMap.current[vid];
       // 更新 valid
@@ -151,12 +147,6 @@ export const useForm = <T extends object>(
         setValid(computedValid);
       }
       checkerQueue.current = checkerQueue.current.filter((x) => x.vid === vid);
-      console.log('unmount', checkerQueue.current);
-      // checkerQueue.current.forEach((c, index) => {
-      //   if (c.vid === vid) {
-      //     checkerQueue.current.splice(index, 1);
-      //   }
-      // });
     },
     [setValid, validRef],
   );
