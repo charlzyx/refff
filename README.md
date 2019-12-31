@@ -3,5 +3,5 @@
 
 # Todos
 - undo / redo
-- validate 完善
 - jest
+- doc

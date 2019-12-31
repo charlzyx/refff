@@ -4,7 +4,7 @@ import {
   SetStateAction,
   useCallback,
   useRef,
-  useState
+  useState,
 } from 'react';
 
 const get = <S>(init: S | (() => S)): S => {
@@ -15,7 +15,7 @@ const get = <S>(init: S | (() => S)): S => {
 };
 
 export const useRefState = <S>(
-  initialState: S | (() => S)
+  initialState: S | (() => S),
 ): [S, Dispatch<SetStateAction<S>>, MutableRefObject<S>] => {
   const ref = useRef(get(initialState));
   const [state, setState] = useState(() => {
@@ -24,9 +24,9 @@ export const useRefState = <S>(
     return value;
   });
 
-  const setValue = useCallback<typeof setState>(next => {
+  const setValue = useCallback<typeof setState>((next) => {
     if (next instanceof Function) {
-      setState(prev => {
+      setState((prev) => {
         const nextValue = next(prev);
         ref.current = nextValue;
         return nextValue;

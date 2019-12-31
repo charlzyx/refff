@@ -1,14 +1,16 @@
 import { Pipe, TFieldMeta, TPipeConfig } from '@refff/core';
 
 const isEmpty = (x: any) => {
-  if (Array.isArray(x)) return x.length === 0;
+  if (Array.isArray(x)) {
+    return x.length === 0;
+  }
   return true;
 };
 
 const pipe = (
   defaults: Required<TPipeConfig>,
   statics: TPipeConfig = {},
-  props: TPipeConfig = {}
+  props: TPipeConfig = {},
 ): Required<TPipeConfig> => {
   // props.order > statics.order > defaults.order
   const order: Required<TPipeConfig>['order'] =
@@ -19,10 +21,10 @@ const pipe = (
       : props.order) || [];
   const pipes = {
     v2c: [] as Pipe[],
-    c2v: [] as Pipe[]
+    c2v: [] as Pipe[],
   };
 
-  order.forEach(key => {
+  order.forEach((key) => {
     switch (key) {
       case 'props':
         pipes.v2c =
@@ -60,17 +62,30 @@ const pipe = (
   return {
     v2c: pipes.v2c,
     c2v: pipes.c2v,
-    order
+    order,
   };
 };
 
 const isObject = (x: any) =>
   Object.prototype.toString.call(x) === '[object Object]';
-const mapping = (
-  defaults: Required<TFieldMeta>,
-  ...mappings: (TFieldMeta | void)[]
-): Required<TFieldMeta> => {
-  return mappings.reduce<Required<TFieldMeta>>((map, m) => {
+
+const mappingChild = (
+  defaults: Required<TFieldMeta['child']>,
+  ...mappings: (TFieldMeta['child'] | void)[]
+): Required<TFieldMeta['child']> => {
+  return mappings.reduce<Required<TFieldMeta['child']>>((map, m) => {
+    if (isObject(m)) {
+      return { ...map, ...m };
+    }
+    return map;
+  }, defaults);
+};
+
+const mappingField = (
+  defaults: Required<TFieldMeta['field']>,
+  ...mappings: (TFieldMeta['field'] | void)[]
+): Required<TFieldMeta['field']> => {
+  return mappings.reduce<Required<TFieldMeta['field']>>((map, m) => {
     if (isObject(m)) {
       return { ...map, ...m };
     }
@@ -80,5 +95,8 @@ const mapping = (
 
 export const merge = {
   pipe,
-  mapping
+  mapping: {
+    child: mappingChild,
+    field: mappingField,
+  },
 };

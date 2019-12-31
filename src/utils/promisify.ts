@@ -7,9 +7,9 @@ export const promisify = (fn: Function): Promise<string | void> => {
     const ans = fn();
     if (thenable(ans)) {
       return ans;
-    } else {
-      return Promise.resolve(ans);
     }
+    return Promise.resolve(ans);
+
   } catch (error) {
     return Promise.reject(error);
   }

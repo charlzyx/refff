@@ -1,164 +1,193 @@
 import { DeepReadonly, Effects, Event, PathMap, ValidMap } from '@refff/core';
 import { Patch, applyPatches, produce } from 'immer';
-import { dying, isValid, pool } from '../utils';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { dying, isMatch, isValid, pool } from '../utils';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { TCtx } from './ctx';
 import _ from 'lodash';
+import { useRefState } from '../utils/useRefState';
 
 export const useForm = <T extends object>(
   init: T,
-  effect?: (data: T, type: Effects, e?: any) => void
+  effect?: (data: T, type: Effects, e?: any) => void,
 ) => {
   const uid = useRef(_.uniqueId('fff_form'));
+  // 初始值
   const data = useRef<T>(init);
-  const [valid, setValid] = useState(false);
+  // 实时校验结果
+  const [valid, setValid, validRef] = useRefState(false);
+  // vid: validStatus
   const validMap = useRef<ValidMap>({});
+  // vid: path
   const pathMap = useRef<PathMap>({});
+  // vid, runner[]
   const checkerQueue = useRef<{ vid: string; runner: Event.validator }[]>([]);
-
+  // form context
   const ctx = useRef<TCtx>({
     config: {},
-    data: data,
-    fid: uid.current
+    data,
+    fid: uid.current,
   });
-
+  // history
   const history = useRef<Patch[]>([]);
+  // redos
   const redos = useRef<Patch[]>([]);
-
+  // events manager
   const { emit, on } = pool.get(uid.current);
 
   /**
-   * WIP: 时光旅行
+   * WIP: 时光旅行, 太难了, 写不出来
    */
-  const undo = useCallback(() => {
-    const patch = history.current.pop();
-    if (patch) {
-      redos.current.push(patch);
-      const next = applyPatches(data.current, [patch]);
-      data.current = next;
-      emit.change({
-        next: patch.value,
-        path: patch.path,
-        source: uid.current
-      });
-    }
-  }, [emit]);
+  // const undo = useCallback(() => {}, []);
+  // const redo = useCallback(() => {}, []);
 
-  const redo = useCallback(() => {
-    const patch = redos.current.pop();
-    redos.current.pop();
-    if (patch) {
-      history.current.push(patch);
-      const next = applyPatches(data.current, [patch]);
-      data.current = next;
-      emit.change({
-        next: patch.value,
-        path: patch.path,
-        source: uid.current
-      });
-    }
-  }, [emit]);
-
-  // 外部触发的方法们
+  // 加载完成, 广播最新值
+  const doInit = useCallback(
+    (next: T) => {
+      emit.init({ next });
+    },
+    [emit],
+  );
+  // 外部修改字段值
   const doPut = useCallback(
     (recipe: (copy: T) => void | T) => {
       const next = produce(data.current, recipe, (patches, inversPatches) => {
-        history.current.push(...inversPatches.reverse());
-        patches.forEach(patch => {
+        history.current.push(...inversPatches);
+        patches.forEach((patch) => {
           emit.change({
             next: patch.value,
             path: patch.path,
-            source: uid.current
+            source: uid.current,
           });
         });
       });
       data.current = next as T;
+      // if (effect) effect(data.current, 'change');
       return next;
     },
-    [emit]
+    [emit],
   );
-
+  // 重置表单值
   const doReset = useCallback(
-    (path?: string) => {
-      const next = applyPatches(data.current, [
-        ...redos.current.reverse(),
-        ...history.current
-      ]);
-      history.current = [];
-      redos.current = [];
-      data.current = next;
-      emit.reset({ path });
+    (reset?: T, withValid?: boolean, path?: string) => {
+      // 只有内部调用才有 path
+      if (path) {
+        emit.reset({ path, replaced: !!reset, withValid });
+      } else {
+        const next = applyPatches(data.current, history.current.reverse());
+        history.current = [];
+        redos.current = [];
+        data.current = reset ? reset : next;
+        // doInit(data.current);
+        setTimeout(() => {
+          emit.reset({ path, replaced: !!reset, withValid });
+        });
+      }
     },
-    [emit]
+    [emit],
   );
 
+  const outReset = useCallback(
+    (reset?: T, withValid?: boolean) => {
+      doReset(reset, withValid);
+    },
+    [doReset],
+  );
+  // 清理校验状态
   const doClean = useCallback(
     (path?: string) => {
       emit.clean({ path });
     },
-    [emit]
+    [emit],
   );
-
+  // 进行异步校验
   const doChecking = useCallback((path?: string) => {
     if (path) {
-      const checker = checkerQueue.current.find(
-        c => pathMap.current[c.vid] === path
+      const checker = checkerQueue.current.find((c) =>
+        isMatch(pathMap.current[c.vid], path),
       );
       if (checker && typeof checker.runner === 'function') {
         return checker.runner().then(() => _.get(data.current, path));
-      } else {
-        return Promise.resolve(_.get(data.current, path));
       }
-    } else {
-      return Promise.all(checkerQueue.current.map(c => c.runner())).then<T>(
-        () => {
-          return data.current;
-        }
-      );
+      return Promise.resolve(_.get(data.current, path));
     }
+    return Promise.all(checkerQueue.current.map((c) => c.runner())).then(
+      () => data.current,
+    );
   }, []);
 
   // 监听者们
-
-  const onMounted = useCallback<Event.mounted>(({ vid, path, checker }) => {
-    pathMap.current[vid] = path;
-    validMap.current[vid] = 'init';
-    checkerQueue.current.push({ vid, runner: checker });
-  }, []);
-  const onUnMounted = useCallback<Event.unmounted>(({ vid }) => {
-    delete pathMap.current[vid];
-    delete validMap.current[vid];
-    checkerQueue.current.forEach((c, index) => {
-      if (c.vid === vid) {
-        checkerQueue.current.splice(index, 1);
+  // 挂载 Field
+  const onMounted = useCallback<Event.mounted>(
+    ({ vid, path, checker, validStatus }) => {
+      pathMap.current[vid] = path;
+      validMap.current[vid] = validStatus;
+      // 更新 valid
+      const computedValid = isValid(validMap.current);
+      if (computedValid !== validRef.current) {
+        setValid(computedValid);
       }
-    });
-  }, []);
+      const found = checkerQueue.current.findIndex((c) => c.vid === vid);
+      if (found > -1) {
+        checkerQueue.current[found] = { vid, runner: checker };
+      } else {
+        checkerQueue.current.push({ vid, runner: checker });
+      }
+    },
+    [setValid, validRef],
+  );
+  // 卸载 Field
+  const onUnMounted = useCallback<Event.unmounted>(
+    ({ vid }) => {
+      delete pathMap.current[vid];
+      delete validMap.current[vid];
+      // 更新 valid
+      const computedValid = isValid(validMap.current);
+      if (computedValid !== validRef.current) {
+        setValid(computedValid);
+      }
+      checkerQueue.current = checkerQueue.current.filter((x) => x.vid === vid);
+    },
+    [setValid, validRef],
+  );
+  // 校验 Field
+  const onValidate = useCallback<Event.validate>(
+    ({ vid, status }) => {
+      validMap.current[vid] = status;
+      const computedValid = isValid(validMap.current);
+      if (computedValid !== validRef.current) {
+        setValid(computedValid);
+      }
+    },
+    [setValid, validRef],
+  );
+  // 值变化 Field
   const onChange = useCallback<Event.change>(({ next, path, source }) => {
-    if (source === uid.current) return;
-    const nextV = produce(
+    if (source === uid.current) {
+      return;
+    }
+    const neo = produce(
       data.current,
-      draft => {
+      (draft) => {
         _.set(draft, path, next);
       },
       (patches, inversPatches) => {
-        history.current.push(...inversPatches.reverse());
-      }
+        history.current.push(...inversPatches);
+      },
     );
-    data.current = nextV as T;
-    // _.set(data.current, path, value);
-  }, []);
-  const onValidate = useCallback<Event.validate>(({ vid, status }) => {
-    validMap.current[vid] = status;
-    setValid(isValid(validMap.current));
+    data.current = neo as T;
   }, []);
 
   // 事件的注册与销毁
   useEffect(() => {
-    on.debug((type, e) => {
+    on.all((type, e) => {
       if (typeof effect === 'function') {
-        effect(data.current, type, e);
+        if (/change/.test(type)) {
+          effect(data.current, 'change', e);
+        }
+        if (/reset/.test(type)) {
+          effect(data.current, 'reset', e);
+        }
       }
     });
     const godie = dying(
@@ -166,8 +195,11 @@ export const useForm = <T extends object>(
       on.change(onChange),
       on.validate(onValidate),
       on.mounted(onMounted),
-      on.unmounted(onUnMounted)
+      on.unmounted(onUnMounted),
     );
+    setTimeout(() => {
+      doInit(data.current);
+    });
 
     const id = uid.current;
 
@@ -187,8 +219,8 @@ export const useForm = <T extends object>(
         return ctx;
       }
       return Reflect.get(target.current, key);
-    }
-  }) as DeepReadonly<T & { __ctx: typeof ctx }>;
+    },
+  }) as DeepReadonly<T & { __ctx: typeof ctx; current: typeof data.current }>;
 
   type OverChecking = {
     (path: string): Promise<Partial<T>>;
@@ -196,18 +228,18 @@ export const useForm = <T extends object>(
   };
   const ans: {
     data: typeof proxy;
-    reset: typeof doReset;
+    reset: typeof outReset;
     put: typeof doPut;
     clean: typeof doClean;
     checking: OverChecking;
     valid: typeof valid;
   } = {
     data: proxy,
-    reset: doReset,
+    reset: outReset,
     put: doPut,
     clean: doClean,
     valid,
-    checking: doChecking
+    checking: doChecking,
   };
   return ans;
 };

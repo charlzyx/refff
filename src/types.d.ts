@@ -12,7 +12,11 @@ export declare module '@refff/core' {
     | 'timeout';
   export namespace Event {
     /** 外部调用 重置表单数据 */
-    type reset = (event: { path?: string }) => void;
+    type reset = (event: {
+      path?: string;
+      replaced: boolean;
+      withValid?: boolean;
+    }) => void;
     /** Filed -> useForm 主动校验 */
     type validate = (event: { vid: string; status: ValidateStatus }) => void;
     /** 外部调用 clean validate */
@@ -25,11 +29,14 @@ export declare module '@refff/core' {
       path: Path | Path[];
       source: string;
     }) => void;
-    /** Filed -> useForm 挂载 */
+    /** Form -> Field, 不同步的数据 */
+    type init = (event: { next: any }) => void;
+    /** Field -> useForm 挂载 */
     type mounted = (event: {
       vid: string;
       path: string;
       checker: validator;
+      validStatus: ValidateStatus;
     }) => void;
     /** Filed -> useForm 卸载 */
     type unmounted = (event: { vid: string }) => void;
@@ -39,11 +46,12 @@ export declare module '@refff/core' {
 
   export interface Events {
     on: {
-      debug: (fn: (type: any, e: any) => void) => void;
+      all: (fn: (type: any, e: any) => void) => void;
       change: (fn: Event.change) => Disposer;
       reset: (fn: Event.reset) => Disposer;
       clean: (fn: Event.clean) => Disposer;
       validate: (fn: Event.validate) => Disposer;
+      init: (fn: Event.init) => Disposer;
       mounted: (fn: Event.mounted) => Disposer;
       unmounted: (fn: Event.unmounted) => Disposer;
     };
@@ -52,18 +60,26 @@ export declare module '@refff/core' {
       reset: Event.reset;
       clean: Event.clean;
       validate: Event.validate;
+      init: Event.init;
       mounted: Event.mounted;
       unmounted: Event.unmounted;
     };
   }
 
   export type TFieldMeta = {
-    value?: string;
-    onChange?: string;
-    onBlur?: string;
-    editable?: string;
-    valid?: string;
-    help?: string;
+    child: {
+      value?: string;
+      onChange?: string;
+      onBlur?: string;
+      disabled?: string;
+      valid?: string;
+      help?: string;
+    };
+    field: {
+      disabled?: string;
+      valid?: string;
+      help?: string;
+    };
   };
   export type Pipe = (value: any, props: any) => any;
   export type Combin<T1, T2, T3> =
@@ -93,7 +109,7 @@ export declare module '@refff/core' {
 
   export type FormConfig = {
     trigger?: 'onBlur' | 'onChange';
-    editable?: boolean;
+    disabled?: boolean;
   };
 
   export type DeepReadonly<T> = {

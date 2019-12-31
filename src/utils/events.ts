@@ -1,22 +1,63 @@
 import { Events } from '@refff/core';
-import mitt from 'mitt';
 
 const getTypes = (id: string) => ({
-  change: id + '_change',
-  reset: id + '_reset',
-  clean: id + '_clean',
-  validate: id + '_validate',
-  mounted: id + '_mounted',
-  unmounted: id + '_unmounted'
+  change: `${id}_change`,
+  reset: `${id}_reset`,
+  clean: `${id}_clean`,
+  validate: `${id}_validate`,
+  init: `${id}_init`,
+  mounted: `${id}_mounted`,
+  unmounted: `${id}_unmounted`,
 });
 
-const emitter: mitt.Emitter = mitt();
+const emitter: {
+  watchers: {
+    [x: string]: Function[];
+  };
+  on: (type: string, fn: Function) => void;
+  off: (type: string, fn: Function) => void;
+  emit: (type: string, e: any) => void;
+} = {
+  watchers: {},
+  on(type: string, fn: Function) {
+    this.watchers[type] = this.watchers[type] || [];
+    const found = this.watchers[type].findIndex((x: any) => x === fn);
+    if (found === -1) {
+      this.watchers[type].push(fn);
+    }
+  },
+  off(type: string, fn: Function) {
+    if (!Array.isArray(this.watchers[type])) return;
+    let i = 0;
+    while (i < this.watchers[type].length) {
+      if (this.watchers[type][i] === fn) {
+        this.watchers[type].splice(i, 1);
+      }
+      i++;
+    }
+  },
+  emit(type: string, e: any) {
+    console.count(`EMIT${type}`);
+    if (!Array.isArray(this.watchers[type])) return;
+    let i = 0;
+    while (i < this.watchers[type].length) {
+      this.watchers[type][i](e);
+      i++;
+    }
+    if (!Array.isArray(this.watchers['*'])) return;
+    let idx = 0;
+    while (idx < this.watchers['*'].length) {
+      this.watchers['*'][idx](e);
+      idx++;
+    }
+  },
+};
 
 const events = (id: string): Events => {
   const types = getTypes(id);
   return {
     on: {
-      debug(fn) {
+      all(fn) {
         emitter.on('*', fn);
       },
       change(fn) {
@@ -37,6 +78,12 @@ const events = (id: string): Events => {
           emitter.off(types.clean, fn);
         };
       },
+      init(fn) {
+        emitter.on(types.init, fn);
+        return () => {
+          emitter.off(types.init, fn);
+        };
+      },
       mounted(fn) {
         emitter.on(types.mounted, fn);
         return () => {
@@ -54,7 +101,7 @@ const events = (id: string): Events => {
         return () => {
           emitter.off(types.validate, fn);
         };
-      }
+      },
     },
     emit: {
       change(e) {
@@ -66,6 +113,9 @@ const events = (id: string): Events => {
       clean(e) {
         emitter.emit(types.clean, e);
       },
+      init(e) {
+        emitter.emit(types.init, e);
+      },
       mounted(e) {
         emitter.emit(types.mounted, e);
       },
@@ -74,8 +124,8 @@ const events = (id: string): Events => {
       },
       validate(e) {
         emitter.emit(types.validate, e);
-      }
-    }
+      },
+    },
   };
 };
 
@@ -96,7 +146,7 @@ export const pool: Pool = {
   },
   remove(id: string) {
     delete this.cache[id];
-  }
+  },
 };
 
 const disposer: {
@@ -109,7 +159,7 @@ export const dying = (id: string, ...args: Function[]) => {
   }
   disposer[id].push(...args);
   return () => {
-    disposer[id].forEach(fn => {
+    disposer[id].forEach((fn) => {
       if (typeof fn === 'function') {
         fn();
       }

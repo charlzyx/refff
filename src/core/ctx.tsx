@@ -11,7 +11,7 @@ export type TCtx = {
 export const Ctx = createContext<TCtx>({
   data: { current: {} },
   fid: '',
-  config: {}
+  config: {},
 });
 
 const { Provider, Consumer } = Ctx;

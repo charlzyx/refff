@@ -10,7 +10,7 @@ type UI = {
 type Validator = (
   value: MutableRefObject<any>,
   rule: Rule,
-  label?: string
+  label?: string,
 ) => string | void | Promise<string | void>;
 
 const Empty: FC = () => null;
@@ -19,26 +19,38 @@ const config: {
   UI: UI;
   validator: Validator;
   pipe: Required<TPipeConfig>;
-  meta: Required<TFieldMeta>;
+  meta: {
+    child: Required<TFieldMeta['child']>;
+    field: Required<TFieldMeta['field']>;
+  };
 } = {
   UI: {
     Form: Empty,
     Field: Empty,
-    Notice: Empty
+    Notice: Empty,
   },
-  validator: rules => {
-    if (!rules) return;
+  validator: (rules) => {
+    if (!rules) {
+      return;
+    }
     throw new Error('settings.validator missed');
   },
   pipe: { v2c: [], c2v: [], order: ['default', 'static', 'props'] },
   meta: {
-    value: 'value',
-    onChange: 'onChange',
-    onBlur: 'onBlur',
-    editable: 'editable',
-    valid: 'valid',
-    help: 'help'
-  }
+    child: {
+      value: 'value',
+      onChange: 'onChange',
+      onBlur: 'onBlur',
+      disabled: 'disabled',
+      valid: 'valid',
+      help: 'help',
+    },
+    field: {
+      disabled: 'disabled',
+      valid: 'valid',
+      help: 'help',
+    },
+  },
 };
 
 export type LinkConfig = {
@@ -48,7 +60,7 @@ export type LinkConfig = {
 
 const link = <T extends ElementType>(
   el: T & LinkConfig,
-  conf?: LinkConfig
+  conf?: LinkConfig,
 ): T & Readonly<LinkConfig> => {
   if (conf?.meta) {
     el.meta = conf.meta;
@@ -65,13 +77,20 @@ const set = {
   UI: {
     Form: (el: Config['UI']['Form']) => (config.UI.Form = el),
     Field: (el: Config['UI']['Field']) => (config.UI.Field = el),
-    Notice: (el: Config['UI']['Notice']) => (config.UI.Notice = el)
+    Notice: (el: Config['UI']['Notice']) => (config.UI.Notice = el),
   },
-  validator: (v: Config['validator']) => (config.validator = v),
+  validator: (v: Config['validator']) => {
+    config.validator = v;
+  },
   pipe: (p: Config['pipe']) => (config.pipe = p),
-  meta: (m: Config['meta']) => (config.meta = m)
+  meta: (m: Config['meta']) => (config.meta = m),
 };
 
-const settings = { get: () => config, set };
+const settings = {
+  get: () => {
+    return config;
+  },
+  set,
+};
 
 export { settings, link };
