@@ -36,7 +36,7 @@ export declare module '@refff/core' {
       vid: string;
       path: string;
       checker: validator;
-      validStatus: ValidateStatus;
+      validStatus: ValidateStatus | undefined;
     }) => void;
     /** Filed -> useForm 卸载 */
     type unmounted = (event: { vid: string }) => void;

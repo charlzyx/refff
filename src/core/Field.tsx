@@ -250,11 +250,10 @@ export const Field: FC<TProps> = (props) => {
         // 更新最新值
         setValue(getValueByPath(data.current, __path));
         // 触发挂载事件
-        const validStatus = rules ? (withValid ? 'init' : valid) : 'success';
-        setValidStatus(validStatus);
-        if (validStatus === 'success' || validStatus === 'init') {
-          setHelp('');
-        }
+        const validStatus = rules && withValid ? 'init' : undefined;
+        setValidStatus(validStatus || 'init');
+        setHelp('');
+        touched.current = false;
 
         emit.mounted({
           vid: uid.current,
@@ -266,13 +265,12 @@ export const Field: FC<TProps> = (props) => {
         });
         if (withValid) {
           setTimeout(() => {
-            console.log('vvvvv', __path);
             fnRefs.current.validate();
           });
         }
       }
     },
-    [__path, data, emit, rules, setValue, valid],
+    [__path, data, emit, rules, setValue],
   );
 
   // init 之后再触发各种事情(valid, mounted.....)
@@ -281,8 +279,9 @@ export const Field: FC<TProps> = (props) => {
       // 更新最新值
       setValue(getValueByPath(next, __path));
       // 触发挂载事件
-      const validStatus = rules ? 'init' : 'success';
-      setValidStatus(validStatus);
+      // 触发挂载事件
+      const validStatus = rules ? 'init' : undefined;
+      setValidStatus(validStatus || 'init');
       setHelp('');
       initialized.current = true;
       emit.mounted({

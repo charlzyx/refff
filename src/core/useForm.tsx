@@ -1,4 +1,11 @@
-import { DeepReadonly, Effects, Event, PathMap, ValidMap } from '@refff/core';
+import {
+  DeepReadonly,
+  Effects,
+  Event,
+  PathMap,
+  ValidMap,
+  ValidateStatus,
+} from '@refff/core';
 import { Patch, applyPatches, produce } from 'immer';
 import { dying, isMatch, isValid, pool } from '../utils';
 import { useCallback, useEffect, useRef } from 'react';
@@ -67,6 +74,14 @@ export const useForm = <T extends object>(
     },
     [emit],
   );
+
+  // 清理校验状态
+  const doClean = useCallback(
+    (path?: string) => {
+      emit.clean({ path });
+    },
+    [emit],
+  );
   // 重置表单值
   const doReset = useCallback(
     (reset?: T, withValid?: boolean, path?: string) => {
@@ -78,7 +93,6 @@ export const useForm = <T extends object>(
         history.current = [];
         redos.current = [];
         data.current = reset ? reset : next;
-        // doInit(data.current);
         setTimeout(() => {
           emit.reset({ path, replaced: !!reset, withValid });
         });
@@ -93,13 +107,7 @@ export const useForm = <T extends object>(
     },
     [doReset],
   );
-  // 清理校验状态
-  const doClean = useCallback(
-    (path?: string) => {
-      emit.clean({ path });
-    },
-    [emit],
-  );
+
   // 进行异步校验
   const doChecking = useCallback((path?: string) => {
     if (path) {
@@ -121,7 +129,11 @@ export const useForm = <T extends object>(
   const onMounted = useCallback<Event.mounted>(
     ({ vid, path, checker, validStatus }) => {
       pathMap.current[vid] = path;
-      validMap.current[vid] = validStatus;
+      if (!!validStatus) {
+        validMap.current[vid] = validStatus as ValidateStatus;
+      } else {
+        delete validMap.current[vid];
+      }
       // 更新 valid
       const computedValid = isValid(validMap.current);
       if (computedValid !== validRef.current) {

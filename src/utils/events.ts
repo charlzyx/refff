@@ -37,7 +37,6 @@ const emitter: {
     }
   },
   emit(type: string, e: any) {
-    console.count(`EMIT${type}`);
     if (!Array.isArray(this.watchers[type])) return;
     let i = 0;
     while (i < this.watchers[type].length) {
@@ -47,7 +46,7 @@ const emitter: {
     if (!Array.isArray(this.watchers['*'])) return;
     let idx = 0;
     while (idx < this.watchers['*'].length) {
-      this.watchers['*'][idx](e);
+      this.watchers['*'][idx](type, e);
       idx++;
     }
   },
