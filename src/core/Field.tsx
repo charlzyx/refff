@@ -38,7 +38,7 @@ import { useRefState } from '../utils/useRefState';
 
 const { UI } = settings.get();
 
-const notReady = () => Promise.resolve();
+const notReady = (): Promise<any> => Promise.resolve();
 const noop = (...args: any): any => {};
 
 type TProps = {
@@ -94,7 +94,7 @@ export const Field: FC<TProps> = (props) => {
     reset: noop,
     clean: noop,
     init: noop,
-    validate: noop,
+    validate: notReady,
   });
   // touched flag
   const touched = useRef(false);
