@@ -85,14 +85,16 @@ export const Field: FC<TProps> = (props) => {
   const { fid, data, config } = useContext(Ctx);
   // events
   const { emit, on } = pool.get(fid);
-  const prePath = useRef('');
-  const [initialized, setInitialized] = useState(false);
+  const prePath = useRef(__path);
+  const initialized = useRef(false);
+  const ignored = useRef(false);
   // 方法的引用们
-  const onRefs = useRef({
+  const fnRefs = useRef({
     change: noop,
     reset: noop,
     clean: noop,
     init: noop,
+    validate: noop,
   });
   // touched flag
   const touched = useRef(false);
@@ -124,7 +126,6 @@ export const Field: FC<TProps> = (props) => {
   // 是否 disabled
   const finaldisabled = disabled === undefined ? config.disabled : disabled;
   // 校验函数
-  const checkerRef = useRef<Event.validator>(notReady);
 
   // 触发方法们
   const doChange = useCallback(
@@ -243,7 +244,6 @@ export const Field: FC<TProps> = (props) => {
   // reset 方法
   const onReset = useCallback<Event.reset>(
     ({ path, replaced, withValid }) => {
-      if (__path === undefined) return;
       const deps = getDepsByPath(__path);
       const should = !path || isDepsMatched(path, deps);
       if (should) {
@@ -251,40 +251,45 @@ export const Field: FC<TProps> = (props) => {
         setValue(getValueByPath(data.current, __path));
         // 触发挂载事件
         const validStatus = rules ? (withValid ? 'init' : valid) : 'success';
+        setValidStatus(validStatus);
+        if (validStatus === 'success' || validStatus === 'init') {
+          setHelp('');
+        }
 
         emit.mounted({
           vid: uid.current,
           path: __path,
           checker: () => {
-            return checkerRef.current();
+            return fnRefs.current.validate();
           },
           validStatus,
         });
-        setValidStatus(validStatus);
         if (withValid) {
-          doValidate();
-          // checkerRef.current();
+          setTimeout(() => {
+            console.log('vvvvv', __path);
+            fnRefs.current.validate();
+          });
         }
       }
     },
-    [__path, data, doValidate, emit, rules, setValue, valid],
+    [__path, data, emit, rules, setValue, valid],
   );
 
   // init 之后再触发各种事情(valid, mounted.....)
-  const onInit = useCallback<Event.init & { withValid?: boolean }>(
+  const onInit = useCallback<Event.init>(
     ({ next }) => {
-      if (__path === undefined) return;
       // 更新最新值
       setValue(getValueByPath(next, __path));
       // 触发挂载事件
       const validStatus = rules ? 'init' : 'success';
       setValidStatus(validStatus);
-      setInitialized(true);
+      setHelp('');
+      initialized.current = true;
       emit.mounted({
         vid: uid.current,
         path: __path,
         checker: () => {
-          return checkerRef.current();
+          return fnRefs.current.validate();
         },
         validStatus,
       });
@@ -293,11 +298,12 @@ export const Field: FC<TProps> = (props) => {
   );
 
   useEffect(() => {
-    onRefs.current.change = onChange;
-    onRefs.current.reset = onReset;
-    onRefs.current.clean = onClean;
-    onRefs.current.init = onInit;
-  }, [onChange, onClean, onInit, onReset]);
+    fnRefs.current.change = onChange;
+    fnRefs.current.reset = onReset;
+    fnRefs.current.clean = onClean;
+    fnRefs.current.init = onInit;
+    fnRefs.current.validate = doValidate;
+  }, [onChange, onClean, onInit, onReset, doValidate]);
 
   // 触发 Field effect
   useEffect(() => {
@@ -313,34 +319,35 @@ export const Field: FC<TProps> = (props) => {
       return;
     }
     if (finalTrigger === 'onChange') {
-      doValidate();
+      fnRefs.current.validate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounceValue, finalTrigger]);
 
-  // 更新 useForm 中使用的 run check
+  // 会被 disabled 影响的挂载与卸载
   useEffect(() => {
-    checkerRef.current = doValidate;
-  }, [doValidate]);
-
-  useEffect(() => {
-    if (finaldisabled) {
+    if (!!finaldisabled && ignored.current === false) {
       emit.unmounted({ vid: uid.current });
-    } else {
+      ignored.current = true;
+    }
+    if (!finaldisabled && ignored.current === true) {
       // 模拟一次 init
       emit.init({ next: data.current });
+      ignored.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finaldisabled]);
 
   useEffect(() => {
-    if (!_.isEqual(prePath.current, __path) && initialized) {
+    if (!_.isEqual(prePath.current, __path)) {
       prePath.current = __path;
-      // emit.unmounted({ vid: uid.current });
-      emit.init({ next: data.current });
+      emit.unmounted({ vid: uid.current });
+      setTimeout(() => {
+        emit.init({ next: data.current });
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [__path, initialized]);
+  }, [__path]);
 
   // 校验状态变更, 通知 useForm
   useEffect(() => {
@@ -356,10 +363,10 @@ export const Field: FC<TProps> = (props) => {
 
     const godie = dying(
       uid.current,
-      on.init((...args) => onRefs.current.init(...args)),
-      on.change((...args) => onRefs.current.change(...args)),
-      on.reset((...args) => onRefs.current.reset(...args)),
-      on.clean((...args) => onRefs.current.clean(...args)),
+      on.init((...args) => fnRefs.current.init(...args)),
+      on.change((...args) => fnRefs.current.change(...args)),
+      on.reset((...args) => fnRefs.current.reset(...args)),
+      on.clean((...args) => fnRefs.current.clean(...args)),
     );
     // unmounted
     return () => {
@@ -386,11 +393,11 @@ export const Field: FC<TProps> = (props) => {
         childOnBlur(e);
       }
       if (finalTrigger === 'onBlur') {
-        doValidate();
+        fnRefs.current.validate();
       }
       return e;
     },
-    [childProps.onBlur, doValidate, finalTrigger],
+    [childProps.onBlur, finalTrigger],
   );
 
   const statics = ((children && (children as ReactElement).type) ||

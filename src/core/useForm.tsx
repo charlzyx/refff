@@ -120,6 +120,7 @@ export const useForm = <T extends object>(
   // 挂载 Field
   const onMounted = useCallback<Event.mounted>(
     ({ vid, path, checker, validStatus }) => {
+      console.count('SOMUCH' + 'onMounted');
       pathMap.current[vid] = path;
       validMap.current[vid] = validStatus;
       // 更新 valid
