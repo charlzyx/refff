@@ -10,6 +10,7 @@ import {
 import React, {
   FC,
   ReactElement,
+  ReactNode,
   cloneElement,
   useCallback,
   useContext,
@@ -41,10 +42,19 @@ const { UI } = settings.get();
 const notReady = (): Promise<any> => Promise.resolve();
 const noop = (...args: any): any => {};
 
+const stringifyLabel = (
+  label?: ReactNode | string,
+  helpLabel?: string,
+): string => {
+  if (typeof label === 'string') return label;
+  if (helpLabel) return helpLabel;
+  return '';
+};
+
 type TProps = {
   trigger?: 'onBlur' | 'onChange';
   children:
-    | ReactElement
+    | ReactNode
     | null
     | ((props: {
         value: any;
@@ -53,15 +63,17 @@ type TProps = {
         disabled: boolean;
         valid: ValidateStatus;
         help: string;
-      }) => ReactElement | null);
+      }) => ReactNode | null);
   disabled?: boolean;
   rules?: Rule | Rule[];
   pipe?: TPipeConfig;
   meta?: TFieldMeta;
-  label?: string;
+  label?: string | ReactNode;
+  helpLabel?: string;
   path: any;
   value?: never;
   box?: boolean;
+  setWith?: 'Object';
   effect?: (value: any) => void;
   // list?: boolean;
 } & Omit<FieldProps, 'children'>;
@@ -77,6 +89,8 @@ export const Field: FC<TProps> = (props) => {
     meta,
     box,
     effect,
+    helpLabel,
+    setWith,
     // list,
     ...others
   } = props;
@@ -86,6 +100,7 @@ export const Field: FC<TProps> = (props) => {
   // events
   const { emit, on } = pool.get(fid);
   const prePath = useRef(__path);
+  const preRules = useRef(rules);
   const initialized = useRef(false);
   const ignored = useRef(false);
   // 方法的引用们
@@ -110,11 +125,11 @@ export const Field: FC<TProps> = (props) => {
     (msg: string | undefined | void | null) => {
       if (!msg) return '';
       return msg
-        .replace(/%label/g, others.label || '')
+        .replace(/%label/g, stringifyLabel(others.label, helpLabel) || '')
         .replace(/%path/g, __path.toString() || '')
         .replace(/%value/, valueRef.current);
     },
-    [__path, others.label, valueRef],
+    [__path, helpLabel, others.label, valueRef],
   );
 
   // 校验状态
@@ -138,6 +153,7 @@ export const Field: FC<TProps> = (props) => {
             next: _.get(next, pair[0]),
             path: pair[1],
             source: uid.current,
+            setWith,
           });
         });
       } else {
@@ -145,10 +161,11 @@ export const Field: FC<TProps> = (props) => {
           next,
           path: __path,
           source: uid.current,
+          setWith,
         });
       }
     },
-    [__path, emit, setValue, value],
+    [__path, emit, setValue, setWith, value],
   );
 
   // 校验方法
@@ -163,7 +180,13 @@ export const Field: FC<TProps> = (props) => {
       return Promise.all(
         rules.map((rule) =>
           promisify(() =>
-            settings.get().validator(valueRef, rule, others.label),
+            settings
+              .get()
+              .validator(
+                valueRef,
+                rule,
+                stringifyLabel(others.label, helpLabel),
+              ),
           ),
         ),
       )
@@ -185,7 +208,9 @@ export const Field: FC<TProps> = (props) => {
         });
     }
     return promisify(() =>
-      settings.get().validator(valueRef, rules, others.label),
+      settings
+        .get()
+        .validator(valueRef, rules, stringifyLabel(others.label, helpLabel)),
     )
       .then((msg) => {
         if (count < race.current) {
@@ -202,7 +227,7 @@ export const Field: FC<TProps> = (props) => {
         setHelp(helphelp(error?.message));
         throw error;
       });
-  }, [helphelp, others.label, rules, valueRef]);
+  }, [helpLabel, helphelp, others.label, rules, valueRef]);
 
   // 监听者们
   // 监听外部变更
@@ -212,19 +237,24 @@ export const Field: FC<TProps> = (props) => {
         touched.current = true;
         return;
       }
-      const deps = getDepsByPath(__path);
+      setTimeout(() => {
+        const deps = getDepsByPath(__path);
 
-      const neo = getValueByPath(data.current, __path);
-      if (Array.isArray(deps)) {
-        const matched = isDepsMatched(path, deps);
-        if (matched) {
+        // 就很蛋疼,  有两个同名path的时候 一个更新了,
+        // 另一个在这里获取 neo 的时候, 外面还没更新
+        // 所以外面套一个 setTimeout 等外面更新完
+        const neo = getValueByPath(data.current, __path);
+        if (Array.isArray(deps)) {
+          const matched = isDepsMatched(path, deps);
+          if (matched) {
+            touched.current = true;
+            setValue(neo);
+          }
+        } else if (isMatch(__path, path) && neo !== valueRef.current) {
           touched.current = true;
           setValue(neo);
         }
-      } else if (isMatch(__path, path) && neo !== valueRef.current) {
-        touched.current = true;
-        setValue(neo);
-      }
+      });
     },
     [__path, data, setValue, valueRef],
   );
@@ -251,7 +281,7 @@ export const Field: FC<TProps> = (props) => {
         setValue(getValueByPath(data.current, __path));
         // 触发挂载事件
         const validStatus = rules && withValid ? 'init' : undefined;
-        setValidStatus(validStatus || 'init');
+        setValidStatus(validStatus || 'timeout');
         setHelp('');
         touched.current = false;
 
@@ -281,7 +311,7 @@ export const Field: FC<TProps> = (props) => {
       // 触发挂载事件
       // 触发挂载事件
       const validStatus = rules ? 'init' : undefined;
-      setValidStatus(validStatus || 'init');
+      setValidStatus(validStatus || 'timeout');
       setHelp('');
       initialized.current = true;
       emit.mounted({
@@ -348,8 +378,20 @@ export const Field: FC<TProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [__path]);
 
+  useEffect(() => {
+    if (!_.isEqual(preRules.current, rules)) {
+      preRules.current = rules;
+      emit.unmounted({ vid: uid.current });
+      setTimeout(() => {
+        emit.init({ next: data.current });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rules]);
+
   // 校验状态变更, 通知 useForm
   useEffect(() => {
+    if (!initialized.current) return;
     if (valid !== 'timeout') {
       emit.validate({ vid: uid.current, status: valid });
     }
@@ -436,9 +478,9 @@ export const Field: FC<TProps> = (props) => {
 
   if (typeof children === 'function') {
     return box === true ? (
-      <UI.Field {...filedProps}>{children(overrides)}</UI.Field>
+      <UI.Field {...filedProps}>{(children as FC)(overrides)}</UI.Field>
     ) : (
-      children(overrides)
+      (children as FC)(overrides)
     );
   }
   const clone = cloneElement(children as ReactElement, overrides);

@@ -28,6 +28,7 @@ export declare module '@refff/core' {
       next: any;
       path: Path | Path[];
       source: string;
+      setWith?: 'Object';
     }) => void;
     /** Form -> Field, 不同步的数据 */
     type init = (event: { next: any }) => void;

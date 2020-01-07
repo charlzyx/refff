@@ -136,6 +136,7 @@ export const useForm = <T extends object>(
       }
       // 更新 valid
       const computedValid = isValid(validMap.current);
+
       if (computedValid !== validRef.current) {
         setValid(computedValid);
       }
@@ -154,6 +155,7 @@ export const useForm = <T extends object>(
       delete pathMap.current[vid];
       delete validMap.current[vid];
       // 更新 valid
+
       const computedValid = isValid(validMap.current);
       if (computedValid !== validRef.current) {
         setValid(computedValid);
@@ -166,6 +168,7 @@ export const useForm = <T extends object>(
   const onValidate = useCallback<Event.validate>(
     ({ vid, status }) => {
       validMap.current[vid] = status;
+
       const computedValid = isValid(validMap.current);
       if (computedValid !== validRef.current) {
         setValid(computedValid);
@@ -174,21 +177,28 @@ export const useForm = <T extends object>(
     [setValid, validRef],
   );
   // 值变化 Field
-  const onChange = useCallback<Event.change>(({ next, path, source }) => {
-    if (source === uid.current) {
-      return;
-    }
-    const neo = produce(
-      data.current,
-      (draft) => {
-        _.set(draft, path, next);
-      },
-      (patches, inversPatches) => {
-        history.current.push(...inversPatches);
-      },
-    );
-    data.current = neo as T;
-  }, []);
+  const onChange = useCallback<Event.change>(
+    ({ next, path, source, setWith }) => {
+      if (source === uid.current) {
+        return;
+      }
+      const neo = produce(
+        data.current,
+        (draft) => {
+          if (setWith === 'Object') {
+            _.setWith(draft, path, next, Object);
+          } else {
+            _.set(draft, path, next);
+          }
+        },
+        (patches, inversPatches) => {
+          history.current.push(...inversPatches);
+        },
+      );
+      data.current = neo as T;
+    },
+    [],
+  );
 
   // 事件的注册与销毁
   useEffect(() => {
