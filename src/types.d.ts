@@ -31,7 +31,7 @@ export declare module '@refff/core' {
       setWith?: 'Object';
     }) => void;
     /** Form -> Field, 不同步的数据 */
-    type init = (event: { next: any }) => void;
+    type init = (event: { next: any; source?: string }) => void;
     /** Field -> useForm 挂载 */
     type mounted = (event: {
       vid: string;

@@ -35,7 +35,6 @@ import {
 import { Ctx } from './ctx';
 import _ from 'lodash';
 import { settings } from '../settings';
-import { useRefState } from '../utils/useRefState';
 
 const { UI } = settings.get();
 
@@ -99,10 +98,12 @@ export const Field: FC<TProps> = (props) => {
   const { fid, data, config } = useContext(Ctx);
   // events
   const { emit, on } = pool.get(fid);
-  const prePath = useRef(__path);
+  // const prePath = useRef(__path);
+  const prePath = useRef('');
   const preRules = useRef(rules);
   const initialized = useRef(false);
   const ignored = useRef(false);
+  const timerRef = useRef(setTimeout(() => {}));
   // 方法的引用们
   const fnRefs = useRef({
     change: noop,
@@ -113,10 +114,8 @@ export const Field: FC<TProps> = (props) => {
   });
   // touched flag
   const touched = useRef(false);
-  // value
-  const [value, setValue, valueRef] = useRefState(
-    getValueByPath(data.current, __path),
-  );
+  const [value, setValue] = useState(getValueByPath(data.current, __path));
+  const valueRef = useRef<typeof value>();
   const debounceValue = useDebounce(value);
   // 校验信息
   const [help, setHelp] = useState('');
@@ -146,6 +145,7 @@ export const Field: FC<TProps> = (props) => {
   const doChange = useCallback(
     (next: typeof value) => {
       setValue(next);
+      valueRef.current = next;
       // 结构形式会有多个 path
       if (Array.isArray(__path)) {
         __path.forEach((pair) => {
@@ -249,14 +249,16 @@ export const Field: FC<TProps> = (props) => {
           if (matched) {
             touched.current = true;
             setValue(neo);
+            valueRef.current = neo;
           }
-        } else if (isMatch(__path, path) && neo !== valueRef.current) {
+        } else if (isMatch(__path, path)) {
           touched.current = true;
           setValue(neo);
+          valueRef.current = neo;
         }
       });
     },
-    [__path, data, setValue, valueRef],
+    [__path, data, setValue],
   );
 
   // 清理校验
@@ -276,9 +278,12 @@ export const Field: FC<TProps> = (props) => {
     ({ path, replaced, withValid }) => {
       const deps = getDepsByPath(__path);
       const should = !path || isDepsMatched(path, deps);
+
       if (should) {
         // 更新最新值
-        setValue(getValueByPath(data.current, __path));
+        const next = getValueByPath(data.current, __path);
+        setValue(next);
+        valueRef.current = next;
         // 触发挂载事件
         const validStatus = rules && withValid ? 'init' : undefined;
         setValidStatus(validStatus || 'timeout');
@@ -294,7 +299,7 @@ export const Field: FC<TProps> = (props) => {
           validStatus,
         });
         if (withValid) {
-          setTimeout(() => {
+          timerRef.current = setTimeout(() => {
             fnRefs.current.validate();
           });
         }
@@ -305,9 +310,12 @@ export const Field: FC<TProps> = (props) => {
 
   // init 之后再触发各种事情(valid, mounted.....)
   const onInit = useCallback<Event.init>(
-    ({ next }) => {
+    ({ next, source }) => {
       // 更新最新值
-      setValue(getValueByPath(next, __path));
+      if (source && source !== uid.current) return;
+      const neo = getValueByPath(next, __path);
+      setValue(neo);
+      valueRef.current = neo;
       // 触发挂载事件
       // 触发挂载事件
       const validStatus = rules ? 'init' : undefined;
@@ -361,7 +369,7 @@ export const Field: FC<TProps> = (props) => {
     }
     if (!finaldisabled && ignored.current === true) {
       // 模拟一次 init
-      emit.init({ next: data.current });
+      emit.init({ next: data.current, source: uid.current });
       ignored.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -371,9 +379,13 @@ export const Field: FC<TProps> = (props) => {
     if (!_.isEqual(prePath.current, __path)) {
       prePath.current = __path;
       emit.unmounted({ vid: uid.current });
-      setTimeout(() => {
-        emit.init({ next: data.current });
+      let timer = setTimeout(() => {
+        emit.init({ next: data.current, source: uid.current });
       });
+      return () => {
+        clearTimeout(timer);
+        // clearTimeout(timerRef.current);
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [__path]);
@@ -382,9 +394,12 @@ export const Field: FC<TProps> = (props) => {
     if (!_.isEqual(preRules.current, rules)) {
       preRules.current = rules;
       emit.unmounted({ vid: uid.current });
-      setTimeout(() => {
-        emit.init({ next: data.current });
+      let timer = setTimeout(() => {
+        emit.init({ next: data.current, source: uid.current });
       });
+      return () => {
+        clearTimeout(timer);
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rules]);
@@ -411,6 +426,7 @@ export const Field: FC<TProps> = (props) => {
     );
     // unmounted
     return () => {
+      clearTimeout(timerRef.current);
       godie();
       emit.unmounted({ vid });
     };

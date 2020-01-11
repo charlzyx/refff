@@ -8,11 +8,10 @@ import {
 } from '@refff/core';
 import { Patch, applyPatches, produce } from 'immer';
 import { dying, isMatch, isValid, pool } from '../utils';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { TCtx } from './ctx';
 import _ from 'lodash';
-import { useRefState } from '../utils/useRefState';
 
 export const useForm = <T extends object>(
   init: T,
@@ -22,7 +21,8 @@ export const useForm = <T extends object>(
   // 初始值
   const data = useRef<T>(init);
   // 实时校验结果
-  const [valid, setValid, validRef] = useRefState(false);
+  const [valid, setValid] = useState(false);
+  const validRef = useRef<boolean>();
   // vid: validStatus
   const validMap = useRef<ValidMap>({});
   // vid: path
@@ -139,6 +139,7 @@ export const useForm = <T extends object>(
 
       if (computedValid !== validRef.current) {
         setValid(computedValid);
+        validRef.current = computedValid;
       }
       const found = checkerQueue.current.findIndex((c) => c.vid === vid);
       if (found > -1) {
@@ -159,6 +160,7 @@ export const useForm = <T extends object>(
       const computedValid = isValid(validMap.current);
       if (computedValid !== validRef.current) {
         setValid(computedValid);
+        validRef.current = computedValid;
       }
       checkerQueue.current = checkerQueue.current.filter((x) => x.vid === vid);
     },
@@ -172,6 +174,7 @@ export const useForm = <T extends object>(
       const computedValid = isValid(validMap.current);
       if (computedValid !== validRef.current) {
         setValid(computedValid);
+        validRef.current = computedValid;
       }
     },
     [setValid, validRef],
@@ -219,13 +222,14 @@ export const useForm = <T extends object>(
       on.mounted(onMounted),
       on.unmounted(onUnMounted),
     );
-    setTimeout(() => {
+    let timer = setTimeout(() => {
       doInit(data.current);
     });
 
     const id = uid.current;
 
     return () => {
+      clearTimeout(timer);
       godie();
       pool.remove(id);
     };
